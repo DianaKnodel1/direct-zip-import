@@ -3,10 +3,10 @@
 #  setup.sh — Erst-Setup für WebID-Simulations-Proxy (Cloudflare-Modus)
 # =============================================================================
 #  Installiert:
-#    1. Bun + Caddy + git
+#    1. Node.js + Bun (Build) + Caddy + git
 #    2. Kopiert webid-sim-server nach /opt/apps/webid-sim
 #    3. .env mit SUPABASE_URL + ANON_KEY + SIM_BASE_DOMAIN
-#    4. systemd-Service `webid-sim.service` (Bun auf 127.0.0.1:3002)
+#    4. systemd-Service `webid-sim.service` (Node.js auf 127.0.0.1:3002)
 #    5. Caddy mit Cloudflare-Origin-Zertifikat (kein Let's Encrypt nötig)
 #
 #  Vorab nötig (manuell, einmalig):
@@ -37,10 +37,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 log() { printf "\n\033[1;36m▸ %s\033[0m\n" "$*"; }
 ok()  { printf "\033[1;32m  ✓ %s\033[0m\n" "$*"; }
 
-log "1/4  Bun + Caddy sicherstellen"
+log "1/4  Node.js + Bun + Caddy sicherstellen"
 if command -v apt-get >/dev/null; then
   apt-get update
-  apt-get install -y curl unzip git debian-keyring debian-archive-keyring apt-transport-https ca-certificates
+  apt-get install -y curl unzip git nodejs debian-keyring debian-archive-keyring apt-transport-https ca-certificates
   if ! command -v caddy >/dev/null; then
     curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
     curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
@@ -52,13 +52,14 @@ if ! command -v bun >/dev/null; then
   curl -fsSL https://bun.sh/install | bash
   ln -sf /root/.bun/bin/bun /usr/local/bin/bun
 fi
-ok "Bun + Caddy vorhanden"
+ok "Node.js + Bun + Caddy vorhanden"
 
 log "2/4  Code nach $PROJECT_DIR"
 mkdir -p "$PROJECT_DIR"
 cp -a "$SCRIPT_DIR/." "$PROJECT_DIR/"
 cd "$PROJECT_DIR"
 bun install --production >/dev/null 2>&1 || true
+bun build server.ts --target=node --outfile=server.js
 ok "Code platziert"
 
 log "3/4  .env schreiben"
@@ -75,14 +76,14 @@ ok ".env angelegt"
 log "4/4  systemd + Caddy"
 cat > /etc/systemd/system/webid-sim.service <<EOF
 [Unit]
-Description=WebID-Simulations-Proxy (Bun)
+Description=WebID-Simulations-Proxy (Node.js)
 After=network.target
 
 [Service]
 Type=simple
 WorkingDirectory=$PROJECT_DIR
 EnvironmentFile=$PROJECT_DIR/.env
-ExecStart=/usr/local/bin/bun server.ts
+ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=5
 User=root

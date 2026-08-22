@@ -11,7 +11,7 @@ https://uwk-consulting.webid-portal.de/service/status/cn/000631/aid/620631658
           │
           ▼  Cloudflare (orange Wolke, Universal SSL)
           ▼  Caddy :443 (Origin-Zertifikat, Full Strict)
-          ▼  Bun-Proxy (127.0.0.1:3002)
+          ▼  Node.js-Proxy (127.0.0.1:3002)
           │
           ▼  https://webid-gateway.de/service/status/cn/000631/aid/620631658
 ```
