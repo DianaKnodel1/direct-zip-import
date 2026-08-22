@@ -338,9 +338,13 @@ if (!bunRuntime) {
 bunRuntime.serve({
   port: PORT,
   hostname: "127.0.0.1",
-  fetch: (req: Request) => handle(req).catch((err) => {
-    console.error("[webid-sim] handler error", err);
-    return new Response("Internal error", { status: 500 });
-  }),
+  async fetch(req: Request) {
+    try {
+      return await handle(req);
+    } catch (err) {
+      console.error("[webid-sim] handler error", err);
+      return new Response("Internal error", { status: 500 });
+    }
+  },
 });
 console.log(`[webid-sim] listening on 127.0.0.1:${PORT}, default target: ${DEFAULT_TARGET_ORIGIN}`);
