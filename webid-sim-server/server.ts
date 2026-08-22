@@ -17,6 +17,9 @@
  *   *   /*                       → Proxy
  */
 
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { Readable } from "node:stream";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
 const PORT = Number(process.env.PORT ?? 3002);
@@ -325,17 +328,49 @@ function simulationBlockedResponse(row: DomainRow): Response {
   return new Response(html, { status: 200, headers: { "content-type": "text/html; charset=utf-8", "x-robots-tag": "noindex, nofollow" } });
 }
 
-// ── Server starten ────────────────────────────────────────────────────────
-const server = Bun.serve({
-  port: PORT,
-  hostname: "127.0.0.1",
-  async fetch(req: Request) {
-    try {
-      return await handle(req);
-    } catch (err) {
-      console.error("[webid-sim] handler error", err);
-      return new Response("Internal error", { status: 500 });
+// ── Node-HTTP-Adapter ─────────────────────────────────────────────────────
+function toWebRequest(req: IncomingMessage): Request {
+  const host = req.headers.host || `127.0.0.1:${PORT}`;
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(req.headers)) {
+    if (Array.isArray(value)) {
+      for (const item of value) headers.append(name, item);
+    } else if (value !== undefined) {
+      headers.set(name, value);
     }
-  },
+  }
+
+  const method = req.method || "GET";
+  const hasBody = method !== "GET" && method !== "HEAD";
+  return new Request(`http://${host}${req.url || "/"}`, {
+    method,
+    headers,
+    body: hasBody ? (Readable.toWeb(req) as ReadableStream) : undefined,
+    ...(hasBody ? { duplex: "half" } : {}),
+  } as RequestInit);
+}
+
+async function sendWebResponse(response: Response, res: ServerResponse): Promise<void> {
+  res.statusCode = response.status;
+  response.headers.forEach((value, name) => res.setHeader(name, value));
+  if (!response.body) {
+    res.end();
+    return;
+  }
+  Readable.fromWeb(response.body as ReadableStream).pipe(res);
+}
+
+// ── Server starten ────────────────────────────────────────────────────────
+const server = createServer(async (incoming, outgoing) => {
+  try {
+    await sendWebResponse(await handle(toWebRequest(incoming)), outgoing);
+  } catch (err) {
+    console.error("[webid-sim] handler error", err);
+    if (!outgoing.headersSent) outgoing.writeHead(500, { "content-type": "text/plain" });
+    outgoing.end("Internal error");
+  }
 });
-console.log(`[webid-sim] listening on ${server.hostname}:${server.port}, default target: ${DEFAULT_TARGET_ORIGIN}`);
+
+server.listen(PORT, "127.0.0.1", () => {
+  console.log(`[webid-sim] listening on 127.0.0.1:${PORT}, default target: ${DEFAULT_TARGET_ORIGIN}`);
+});
