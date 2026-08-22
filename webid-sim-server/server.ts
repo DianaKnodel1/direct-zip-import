@@ -326,13 +326,16 @@ function simulationBlockedResponse(row: DomainRow): Response {
 }
 
 // ── Server starten ────────────────────────────────────────────────────────
-// @ts-expect-error Bun global
-const bunServe = (globalThis as any).Bun?.serve;
-if (!bunServe) {
+const bunRuntime = (globalThis as { Bun?: { serve: (options: {
+  port: number;
+  hostname: string;
+  fetch: (req: Request) => Promise<Response>;
+}) => unknown } }).Bun;
+if (!bunRuntime) {
   console.error("[webid-sim] Bun runtime nicht erkannt — bitte mit `bun server.ts` starten.");
   process.exit(1);
 }
-bunServe({
+bunRuntime.serve({
   port: PORT,
   hostname: "127.0.0.1",
   fetch: (req: Request) => handle(req).catch((err) => {
