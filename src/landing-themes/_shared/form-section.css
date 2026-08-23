@@ -38,38 +38,5 @@
 .lv-form-status.success{color:#16a34a;}
 .lv-form-status.error{color:#dc2626;}
 
-/* ===== Per-theme dark overrides (auto-applied via body class) ===== */
-body.theme-midnight .lv-form-section,
-body.theme-qap .lv-form-section,
-body.theme-quantum .lv-form-section,
-body.theme-nebula .lv-form-section{
-  background:
-    radial-gradient(1200px 500px at 10% -10%, color-mix(in oklab, {{primary_color}} 45%, transparent) 0%, transparent 60%),
-    radial-gradient(900px 420px at 100% 110%, color-mix(in oklab, {{primary_color}} 30%, transparent) 0%, transparent 60%),
-    linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
-  color:#e6edf7;
-}
-body.theme-midnight .lv-form-title,
-body.theme-qap .lv-form-title,
-body.theme-quantum .lv-form-title,
-body.theme-nebula .lv-form-title{color:#f8fafc;}
-body.theme-midnight .lv-form-sub,
-body.theme-qap .lv-form-sub,
-body.theme-quantum .lv-form-sub,
-body.theme-nebula .lv-form-sub{color:rgba(226,232,240,.78);}
-body.theme-midnight .lv-form-meta,
-body.theme-qap .lv-form-meta,
-body.theme-quantum .lv-form-meta,
-body.theme-nebula .lv-form-meta{color:rgba(226,232,240,.6);}
-body.theme-midnight .lv-form,
-body.theme-qap .lv-form,
-body.theme-quantum .lv-form,
-body.theme-nebula .lv-form{background:#111726;color:#e6edf7;border-color:color-mix(in oklab, {{primary_color}} 30%, #1f2740);box-shadow:0 30px 70px -20px rgba(0,0,0,.6);}
-body.theme-midnight .lv-form label,
-body.theme-qap .lv-form label,
-body.theme-quantum .lv-form label,
-body.theme-nebula .lv-form label{color:#a3b1c6;}
-body.theme-midnight .lv-form input,
-body.theme-qap .lv-form input,
-body.theme-quantum .lv-form input,
-body.theme-nebula .lv-form input{background:#0a0e14;color:#e6edf7;border-color:#1f2740;}
+/* Per-theme dark overrides are injected by landing-themes.ts. */
+
