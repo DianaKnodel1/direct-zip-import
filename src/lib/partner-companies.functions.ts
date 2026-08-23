@@ -51,7 +51,7 @@ export const savePartnerCompany = createServerFn({ method: "POST" })
       portal_register_url: data.portal_register_url || null,
       intro_headline: data.intro_headline || null,
       intro_subline: data.intro_subline || null,
-      button_label: data.button_label || "Jetzt Termin buchen",
+      button_label: data.button_label || "Jetzt bewerben",
       redirect_delay_ms: data.redirect_delay_ms ?? 2500,
     };
     if (data.id) {
