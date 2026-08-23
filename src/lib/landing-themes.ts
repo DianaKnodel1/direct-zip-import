@@ -219,6 +219,39 @@ function pickSlots(meta: any): ThemeSlot[] {
 // und nicht für Stammdaten-Eingabe.
 void sharedFormHtml; void sharedFormCss; void sharedFormJs;
 
+// Dunkle Themes benötigen ein dunkles Formular, damit der weiße Card-Look
+// nicht wie ein Fremdkörper wirkt. Overrides werden zusätzlich zum Shared-CSS
+// angehängt und ergänzen dieselben Klassen (.lv-form-section, .lv-form ...).
+const DARK_FORM_OVERRIDE = `
+/* dark theme override */
+.lv-form-section{background:radial-gradient(1200px 500px at 10% -10%, color-mix(in oklab, {{primary_color}} 45%, transparent) 0%, transparent 60%),radial-gradient(900px 420px at 100% 110%, color-mix(in oklab, {{primary_color}} 30%, transparent) 0%, transparent 60%),linear-gradient(180deg,#0b1220 0%,#0f172a 100%);color:#e6edf7;}
+.lv-form-title{color:#f8fafc;}
+.lv-form-sub{color:rgba(226,232,240,.78);}
+.lv-form-meta{color:rgba(226,232,240,.6);}
+.lv-form{background:#111726;color:#e6edf7;border-color:color-mix(in oklab, {{primary_color}} 30%, #1f2740);box-shadow:0 30px 70px -20px rgba(0,0,0,.6);}
+.lv-form label{color:#a3b1c6;}
+.lv-form input{background:#0a0e14;color:#e6edf7;border-color:#1f2740;}
+.lv-form input:focus{border-color:{{primary_color}};box-shadow:0 0 0 3px color-mix(in oklab, {{primary_color}} 30%, transparent);}
+`;
+
+// Warm-editorial (heller Beige-Untergrund) — passt zu editorial-premium.
+const EDITORIAL_FORM_OVERRIDE = `
+/* editorial theme override */
+.lv-form-section{background:linear-gradient(180deg,#f7f2e9 0%,#efe7d8 100%);color:#1a1614;}
+.lv-form-title{color:#1a1614;font-family:'Fraunces',Georgia,serif;font-weight:600;}
+.lv-form-sub{color:#6b5f53;}
+.lv-form-meta{color:#8a7d70;}
+.lv-form{background:#ffffff;border-color:#e4dac9;}
+`;
+
+const FORM_OVERRIDES: Record<string, string> = {
+  "theme-midnight-premium": DARK_FORM_OVERRIDE,
+  "theme-qa-platform-premium": DARK_FORM_OVERRIDE,
+  "theme-quantum-tech": DARK_FORM_OVERRIDE,
+  "theme-nebula-flux": DARK_FORM_OVERRIDE,
+  "theme-editorial-premium": EDITORIAL_FORM_OVERRIDE,
+};
+
 function pickFormAssets(id: string): { html: string; css: string } {
   if (id === "theme-tts-consultant") return { html: ttsFormHtml, css: ttsFormCss };
   if (id === "theme-eilers-replica") return { html: eilFormHtml, css: eilFormCss };
@@ -236,9 +269,10 @@ function pickFormAssets(id: string): { html: string; css: string } {
   if (id === "theme-connect-people") return { html: cpFormHtml, css: cpFormCss };
   if (id === "theme-talent-hub") return { html: thFormHtml, css: thFormCss };
   if (id === "theme-noir-executive") return { html: noirFormHtml, css: noirFormCss };
-  return { html: sharedFormHtml, css: sharedFormCss };
-
+  const override = FORM_OVERRIDES[id] ?? "";
+  return { html: sharedFormHtml, css: `${sharedFormCss}\n${override}` };
 }
+
 
 // Themes mit bereits eingebauter Bewerbungs-Sektion (z.B. Privacy Guardian)
 const HAS_OWN_FORM = new Set<string>([]);
