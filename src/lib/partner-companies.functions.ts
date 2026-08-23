@@ -33,7 +33,7 @@ const SaveInput = z.object({
   portal_register_url: z.string().max(500).optional().default(""),
   intro_headline: z.string().max(200).optional().default(""),
   intro_subline: z.string().max(500).optional().default(""),
-  button_label: z.string().max(80).optional().default("Jetzt Termin buchen"),
+  button_label: z.string().max(80).optional().default("Jetzt bewerben"),
   redirect_delay_ms: z.number().int().min(0).max(60000).optional().default(2500),
 });
 
