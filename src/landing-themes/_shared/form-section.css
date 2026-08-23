@@ -1,19 +1,75 @@
-/* Shared inline application form — injected into themes that opt in. */
-.lv-form-section{padding:80px 20px;background:linear-gradient(135deg, color-mix(in oklab, {{primary_color}} 80%, #000) 0%, color-mix(in oklab, {{primary_color}} 30%, #111318) 100%);color:#f8fafc;}
+/* Shared inline application form — light, tinted per theme via {{primary_color}}. */
+.lv-form-section{
+  position:relative;
+  padding:88px 20px;
+  background:
+    radial-gradient(1200px 500px at 10% -10%, color-mix(in oklab, {{primary_color}} 14%, transparent) 0%, transparent 60%),
+    radial-gradient(900px 420px at 100% 110%, color-mix(in oklab, {{primary_color}} 10%, transparent) 0%, transparent 60%),
+    linear-gradient(180deg, color-mix(in oklab, {{primary_color}} 6%, #ffffff) 0%, color-mix(in oklab, {{primary_color}} 3%, #f8fafc) 100%);
+  color:#0f172a;
+}
 .lv-form-wrap{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;}
 @media (max-width:860px){.lv-form-wrap{grid-template-columns:1fr;gap:32px;}}
-.lv-form-eyebrow{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:{{primary_color}};margin-bottom:14px;}
-.lv-form-title{font-size:clamp(28px,4vw,42px);font-weight:800;line-height:1.15;margin:0 0 16px;color:#fff;}
-.lv-form-sub{font-size:16px;line-height:1.6;color:rgba(248,250,252,.78);margin:0 0 18px;}
-.lv-form-meta{font-size:14px;color:rgba(248,250,252,.6);margin:0;}
-.lv-form{background:#fff;color:#0f172a;border-radius:16px;padding:28px;box-shadow:0 20px 50px -10px rgba(0,0,0,.4);}
+.lv-form-eyebrow{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:{{primary_color}};margin-bottom:14px;padding:6px 12px;border-radius:999px;background:color-mix(in oklab, {{primary_color}} 12%, transparent);}
+.lv-form-title{font-size:clamp(28px,4vw,42px);font-weight:800;line-height:1.15;margin:0 0 16px;color:#0f172a;letter-spacing:-.01em;}
+.lv-form-sub{font-size:16px;line-height:1.65;color:#475569;margin:0 0 18px;}
+.lv-form-meta{font-size:14px;color:#64748b;margin:0;}
+.lv-form{
+  position:relative;
+  background:#ffffff;
+  color:#0f172a;
+  border:1px solid color-mix(in oklab, {{primary_color}} 18%, #e2e8f0);
+  border-radius:18px;
+  padding:30px;
+  box-shadow:0 24px 60px -18px color-mix(in oklab, {{primary_color}} 40%, rgba(15,23,42,.28));
+}
+.lv-form::before{
+  content:"";position:absolute;left:0;right:0;top:0;height:4px;border-radius:18px 18px 0 0;
+  background:linear-gradient(90deg, {{primary_color}}, color-mix(in oklab, {{primary_color}} 55%, #ffffff));
+}
 .lv-form-h3{margin:0 0 18px;font-size:20px;font-weight:700;}
 .lv-form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .lv-form label{display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:12px;}
-.lv-form input{display:block;width:100%;margin-top:6px;padding:11px 13px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;color:#0f172a;background:#fff;box-sizing:border-box;}
-.lv-form input:focus{outline:2px solid {{primary_color}};outline-offset:1px;border-color:{{primary_color}};}
-.lv-form-submit{display:block;width:100%;margin-top:8px;padding:14px 18px;border:0;border-radius:999px;background:{{primary_color}};color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s;}
-.lv-form-submit:hover{transform:translateY(-1px);box-shadow:0 8px 24px -6px color-mix(in oklab, {{primary_color}} 55%, transparent);}
+.lv-form input{display:block;width:100%;margin-top:6px;padding:11px 13px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;color:#0f172a;background:#fff;box-sizing:border-box;transition:border-color .15s, box-shadow .15s;}
+.lv-form input:focus{outline:none;border-color:{{primary_color}};box-shadow:0 0 0 3px color-mix(in oklab, {{primary_color}} 25%, transparent);}
+.lv-form-submit{display:block;width:100%;margin-top:8px;padding:14px 18px;border:0;border-radius:999px;background:{{primary_color}};color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s,background .15s;}
+.lv-form-submit:hover{transform:translateY(-1px);background:color-mix(in oklab, {{primary_color}} 88%, #000);box-shadow:0 10px 28px -8px color-mix(in oklab, {{primary_color}} 60%, transparent);}
 .lv-form-status{margin:12px 0 0;font-size:14px;min-height:1em;}
 .lv-form-status.success{color:#16a34a;}
 .lv-form-status.error{color:#dc2626;}
+
+/* ===== Per-theme dark overrides (auto-applied via body class) ===== */
+body.theme-midnight .lv-form-section,
+body.theme-qap .lv-form-section,
+body.theme-quantum .lv-form-section,
+body.theme-nebula .lv-form-section{
+  background:
+    radial-gradient(1200px 500px at 10% -10%, color-mix(in oklab, {{primary_color}} 45%, transparent) 0%, transparent 60%),
+    radial-gradient(900px 420px at 100% 110%, color-mix(in oklab, {{primary_color}} 30%, transparent) 0%, transparent 60%),
+    linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
+  color:#e6edf7;
+}
+body.theme-midnight .lv-form-title,
+body.theme-qap .lv-form-title,
+body.theme-quantum .lv-form-title,
+body.theme-nebula .lv-form-title{color:#f8fafc;}
+body.theme-midnight .lv-form-sub,
+body.theme-qap .lv-form-sub,
+body.theme-quantum .lv-form-sub,
+body.theme-nebula .lv-form-sub{color:rgba(226,232,240,.78);}
+body.theme-midnight .lv-form-meta,
+body.theme-qap .lv-form-meta,
+body.theme-quantum .lv-form-meta,
+body.theme-nebula .lv-form-meta{color:rgba(226,232,240,.6);}
+body.theme-midnight .lv-form,
+body.theme-qap .lv-form,
+body.theme-quantum .lv-form,
+body.theme-nebula .lv-form{background:#111726;color:#e6edf7;border-color:color-mix(in oklab, {{primary_color}} 30%, #1f2740);box-shadow:0 30px 70px -20px rgba(0,0,0,.6);}
+body.theme-midnight .lv-form label,
+body.theme-qap .lv-form label,
+body.theme-quantum .lv-form label,
+body.theme-nebula .lv-form label{color:#a3b1c6;}
+body.theme-midnight .lv-form input,
+body.theme-qap .lv-form input,
+body.theme-quantum .lv-form input,
+body.theme-nebula .lv-form input{background:#0a0e14;color:#e6edf7;border-color:#1f2740;}
