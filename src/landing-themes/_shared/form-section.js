@@ -305,7 +305,7 @@
       // Calendly sitzt IMMER vor dem Termin. Kein Portal-/Fallback-Link mehr –
       // fehlt der Calendly-Link, ist die Landing Page falsch konfiguriert.
       var bookHref=broker.calendly_url||'';
-      if(bookHref){var cta2=document.createElement('a');cta2.href=bookHref;cta2.target='_blank';cta2.rel='noopener';cta2.textContent='Jetzt Termin buchen  →';
+      if(bookHref){var cta2=document.createElement('a');cta2.href=bookHref;cta2.target='_blank';cta2.rel='noopener';cta2.textContent='Jetzt bewerben  →';
         cta2.style.cssText='display:inline-block;background:#22c55e;color:#fff;text-decoration:none;font-weight:600;padding:14px 28px;border-radius:999px;font-size:16px;box-shadow:0 6px 20px -6px rgba(34,197,94,.55);';box.appendChild(cta2);
         var hint2=document.createElement('p');hint2.textContent='Es öffnet sich ein neues Fenster zur Terminauswahl.';hint2.style.cssText='margin:12px 0 0;font-size:12px;color:#94a3b8;';box.appendChild(hint2);}
       else{var hint3=document.createElement('p');hint3.textContent='Die Terminbuchung ist gerade nicht verfügbar. Bitte kontaktieren Sie uns kurz – wir vereinbaren den Termin persönlich mit Ihnen.';hint3.style.cssText='margin:4px 0 0;font-size:13px;color:#64748b;';box.appendChild(hint3);
