@@ -10,7 +10,7 @@ ENV_FILE="$PROJECT_DIR/.env.server"
 
 REPO_BRANCH="${REPO_BRANCH:-main}"
 # NEUES Repository — immer dieses Repo verwenden (alt: seamless-import-tool, zip-it-up)
-REPO_URL="${REPO_URL:-https://github.com/DianaKnodel1/exactly-as-zipped.git}"
+REPO_URL="${REPO_URL:-https://github.com/DianaKnodel1/direct-zip-import.git}"
 SERVICE_NAME="${SERVICE_NAME:-portal.service}"
 PORT="${PORT:-3000}"
 HOST="${HOST:-127.0.0.1}"
