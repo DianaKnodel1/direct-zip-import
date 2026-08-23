@@ -13,7 +13,7 @@
 .lv-form input{display:block;width:100%;margin-top:6px;padding:11px 13px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;color:#0f172a;background:#fff;box-sizing:border-box;}
 .lv-form input:focus{outline:2px solid {{primary_color}};outline-offset:1px;border-color:{{primary_color}};}
 .lv-form-submit{display:block;width:100%;margin-top:8px;padding:14px 18px;border:0;border-radius:999px;background:{{primary_color}};color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s;}
-.lv-form-submit:hover{transform:translateY(-1px);box-shadow:0 8px 24px -6px rgba(37,99,235,.55);}
+.lv-form-submit:hover{transform:translateY(-1px);box-shadow:0 8px 24px -6px color-mix(in oklab, {{primary_color}} 55%, transparent);}
 .lv-form-status{margin:12px 0 0;font-size:14px;min-height:1em;}
 .lv-form-status.success{color:#16a34a;}
 .lv-form-status.error{color:#dc2626;}
