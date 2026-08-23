@@ -1,50 +1,56 @@
-# Remote-Umstellung auf `direct-zip-import` + Deploy
+# Migrations-Ausgabe fehlt im Deploy-Log
 
-Neues Remote: `https://github.com/DianaKnodel1/direct-zip-import.git` (Branch `main`, Repo public angenommen — falls Token nötig, bitte vorher melden).
+## Beobachtung
 
-Ziel-Server: **Frontend**, **WebID (servervps)**, **Bot**.
-Nicht angefasst: backendserver, landing-page-server (werden über `deploy.sh` vom Frontend mitgezogen).
+Im letzten Deploy-Log auf dem Frontend-Server bricht die Ausgabe direkt nach dem Vite-Build ab (`✔ You can preview this build...` / `▶ Restart… ▶ Healthcheck…`). Es fehlt komplett:
 
-## Repo-Pfade (bestätigt)
+- `▸ 3/5  release activation`
+- `▸ 4/5  migrations` inkl. „Applying …" pro `.sql`
+- `▸ 5/5  restart`
+- `✓ Deploy finished`
 
-- Frontend: `/opt/apps/portal` (aktuell `exactly-as-zipped.git`)
-- WebID (servervps): `/opt/apps/portal` (aktuell `exactly-as-zipped.git`)
-- Bot: Pfad noch offen — Discovery-Schritt unten
+Das sind exakt die Stufen aus `scripts/deploy.sh` (das Skript, das früher die Migrations-Ausgabe erzeugt hat).
 
-Alte/Backup-Repos auf Frontend (`portal.wrong-repo`, `portal.bak-*`) werden nicht angefasst.
+## Wahrscheinliche Ursache
 
-## Ablauf pro Server
+Auf dem Server wird gerade **nicht** `scripts/deploy.sh` ausgeführt, sondern ein anderes `deploy.sh` (z.B. `/opt/apps/portal/deploy.sh`). Hinweise:
 
-Für jeden Server derselbe Ablauf:
+- Im vorherigen Fehler kam `deploy.sh: line 17: ... bun run build` — `scripts/deploy.sh` hat in Zeile 17 aber `log()`-Definitionen, kein `bun run build`.
+- Die Ausgabe endet mit `▶ Restart… ▶ Healthcheck…` — das sind Nitro/Wrangler-Post-Hooks, nicht unsere `log`-Zeilen.
+- Damit läuft der ganze Block „4/5 migrations" nie an, und die `manual-migrations/*.sql` werden nicht gegen den Backend-DB gespielt → keine Ausgabe, kein State-Update in `.deploy-migrations-applied`.
 
-1. Backup des aktuellen Working Trees als Sicherheitsnetz (`portal.bak-<timestamp>`).
-2. Remote auf neues Repo umbiegen (`git remote set-url origin …`).
-3. `git fetch origin` + `git reset --hard origin/main` (sauberer Stand aus dem neuen Repo).
-4. Deploy triggern.
+Zusätzlich möglich, aber sekundär: selbst wenn `scripts/deploy.sh` liefe, würde der Migrations-Block still übersprungen, wenn
+- `TARGET_DB_URL` in `.env`/`.env.server` fehlt, oder
+- Port `5432` auf `190.97.167.123` vom Frontend-Server nicht erreichbar ist und `scripts/sync-to-backend.sh` fehlt.
 
-## Deploy-Kommandos pro Server
+## Plan
 
-- Frontend `/opt/apps/portal`: `bash deploy.sh` (zieht landing-page + backend-Sync mit).
-- WebID `/opt/apps/portal` auf servervps: `bash setup.sh` bzw. `systemctl restart webid-sim` nach `bun install` + Build (genaues Skript wird aus dem Repo-Root gelesen, kein manuelles Raten).
-- Bot: Deploy-Skript aus dem Repo-Root (üblicherweise `deploy.sh` oder `start.sh`) — konkreter Befehl steht nach Discovery fest.
+1. **Auf dem Frontend-Server prüfen, welches Skript wirklich läuft** und ob das erwartete Skript existiert:
 
-## Discovery-Schritt für den Bot-Server (einmalig)
+   ```bash
+   ls -la /opt/apps/portal/deploy.sh /opt/apps/portal/scripts/deploy.sh 2>/dev/null
+   head -20 /opt/apps/portal/deploy.sh 2>/dev/null
+   ```
 
-Auf dem Bot-Server ausführen, damit Pfad + aktuelles Remote sichtbar werden:
+   - Wenn `/opt/apps/portal/deploy.sh` ein eigenes Mini-Skript ist → das ist der Grund. Fix: dieses File durch einen Wrapper ersetzen, der `scripts/deploy.sh` aufruft (oder direkt `bash scripts/deploy.sh` statt `bash deploy.sh` verwenden).
 
-```bash
-find /opt /root /home -maxdepth 5 -type d -name ".git" 2>/dev/null | while read g; do
-  d=$(dirname "$g"); echo "=== $d ==="; git -C "$d" remote -v
-done
-```
+2. **Migrations-Voraussetzungen verifizieren** (nur nötig, sobald wieder `scripts/deploy.sh` läuft):
 
-Sobald Pfad bekannt: gleicher 4-Schritt-Ablauf wie oben.
+   ```bash
+   grep -E '^(TARGET_DB_URL|SUPABASE_URL)=' /opt/apps/portal/.env* 2>/dev/null
+   nc -z -w 2 190.97.167.123 5432 && echo "DB reachable" || echo "DB NOT reachable"
+   ls /opt/apps/portal/supabase/manual-migrations/*.sql | wc -l
+   cat /opt/apps/portal/.deploy-migrations-applied 2>/dev/null | tail
+   ```
 
-## Rollback
+3. **Deploy erneut ausführen** mit dem richtigen Skript:
 
-Falls nach dem Deploy etwas kaputt ist: `systemctl stop <service>` → Backup-Ordner zurückverschieben → Service neu starten. Kein DB-Eingriff nötig, es werden nur App-Dateien getauscht.
+   ```bash
+   cd /opt/apps/portal && bash scripts/deploy.sh
+   ```
 
-## Offene Punkte vor Ausführung
+   Ausgabe sollte wieder `▸ 4/5  migrations` inkl. `· Applying …` zeigen. Wenn nichts „Applied" wird, sind entweder alle SQLs bereits in `.deploy-migrations-applied` als angewendet markiert (dann ist das korrekt — nichts Neues), oder der `nc`-Check schlägt fehl und wir fallen auf `sync-to-backend.sh` zurück.
 
-1. Ist das neue Repo public, oder braucht es einen Token / Deploy-Key? Falls Token: liegt der schon auf den Servern (`~/.git-credentials` / SSH-Key)?
-2. Pfad des Bot-Servers (Output des Discovery-Kommandos).
+## Warum kein Code-Change nötig
+
+Der Fix ist rein operativ (falsches Skript wird aufgerufen bzw. `TARGET_DB_URL`/Netzwerkzugang prüfen). Erst wenn Punkt 1 klar zeigt, dass `scripts/deploy.sh` tatsächlich läuft und die Migrations trotzdem nicht ausgegeben werden, ergänzen wir Logging (z.B. echo, wie viele `.sql` gefunden wurden, bevor die Schleife startet).
