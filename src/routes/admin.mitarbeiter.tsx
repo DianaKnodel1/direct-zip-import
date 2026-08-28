@@ -120,6 +120,28 @@ function AdminMitarbeiterPage() {
   }, [rows, q, tab]);
   const pagination = usePagination(filtered, 50);
 
+  function exportCsv() {
+    if (filtered.length === 0) {
+      toast.error("Keine Datensätze zum Exportieren vorhanden.");
+      return;
+    }
+    const csv = contactRowsToCsv(filtered.map(r => {
+      const split = splitName(r.name);
+      return {
+        firstName: r.firstName || split.firstName,
+        lastName: r.lastName || split.lastName,
+        email: r.email,
+        phone: r.phone,
+        street: r.street,
+        zip: r.zip,
+        city: r.city,
+        country: "",
+      };
+    }));
+    downloadCsv(`mitarbeiter-${dateStamp()}.csv`, csv);
+  }
+
+
   const allVisibleSelected = filtered.length > 0 && filtered.every(r => selected.has(r.id));
   const toggleAllVisible = () => {
     const next = new Set(selected);
