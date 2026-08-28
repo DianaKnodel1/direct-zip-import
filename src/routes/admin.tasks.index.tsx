@@ -17,7 +17,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { EmptyState } from "@/components/EmptyState";
 import { AssignTaskDialog } from "@/components/admin/AssignTaskDialog";
-import { Plus, Trash2, ClipboardList, Pencil, Layers, Copy, Upload, Loader2, UserCheck } from "lucide-react";
+import { BulkImportTasksDialog } from "@/components/admin/BulkImportTasksDialog";
+import { Plus, Trash2, ClipboardList, Pencil, Layers, Copy, Upload, Loader2, UserCheck, FileUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function AdminTasksPage() {
@@ -39,6 +40,7 @@ function AdminTasksPage() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState("");
   const [assignTemplateId, setAssignTemplateId] = useState<string | null>(null);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const uploadImage = async (file: File) => {
     if (file.size > 5 * 1024 * 1024) {
       toast({ title: "Datei zu groß", description: "Max. 5 MB.", variant: "destructive" });
@@ -199,6 +201,9 @@ function AdminTasksPage() {
           <Button size="sm" variant="outline" onClick={() => navigate("/admin/tasks/builder/new")} className="gap-1.5">
             <Layers className="h-3.5 w-3.5" /> Builder
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setShowBulkImport(true)} className="gap-1.5">
+            <FileUp className="h-3.5 w-3.5" /> Aufträge importieren
+          </Button>
           <Button size="sm" onClick={() => { resetForm(); setShowCreate(true); }} className="gap-1.5">
             <Plus className="h-3.5 w-3.5" /> Schnell
           </Button>
@@ -350,6 +355,12 @@ function AdminTasksPage() {
         open={!!assignTemplateId}
         onOpenChange={(o) => { if (!o) setAssignTemplateId(null); }}
         templateId={assignTemplateId}
+      />
+
+      <BulkImportTasksDialog
+        open={showBulkImport}
+        onOpenChange={setShowBulkImport}
+        onImported={loadData}
       />
     </div>
   );
