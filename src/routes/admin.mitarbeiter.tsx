@@ -58,6 +58,12 @@ function AdminMitarbeiterPage() {
           // Die echte Adresse steht im Login-Konto; Bewerbung nur als Rückfall.
           email: (p.user_id && userEmails.get(p.user_id)) || app?.email || "—",
           phone: p.phone || app?.phone || "—",
+          // Nur für den CSV-Kontaktexport — beeinflusst Liste/Filter nicht.
+          firstName: app?.first_name ?? null,
+          lastName: app?.last_name ?? null,
+          street: p.street || p.address || app?.address || null,
+          zip: p.zip_code || app?.postal_code || null,
+          city: p.city || app?.city || null,
           status: p.status as EmployeeStatus,
           onboarding: p.onboarding_status as keyof typeof ONBOARDING_STATUS_CONFIG,
           createdAt: p.created_at,
@@ -68,6 +74,7 @@ function AdminMitarbeiterPage() {
             p.onboarding_status === "abgeschlossen"
           ),
         };
+
       })
       .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   }, [applications, profiles, kycList, adminUserIds, userEmails]);
