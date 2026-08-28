@@ -89,20 +89,40 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       }
     );
 
-    const { data, error } = await supabase.auth.getClaims(token);
-    if (error || !data?.claims) {
-      throw new Error('Unauthorized: Invalid token');
+    // Self-hosted Supabase signiert Tokens mit HS256. getClaims() kann dort
+    // fehlschlagen (kein JWKS-Endpoint) - dann validieren wir direkt bei GoTrue.
+    let userId: string | undefined;
+    let claims: Record<string, unknown> | undefined;
+
+    try {
+      const { data, error } = await supabase.auth.getClaims(token);
+      if (!error && data?.claims?.sub) {
+        userId = data.claims.sub as string;
+        claims = data.claims as unknown as Record<string, unknown>;
+      }
+    } catch {
+      // fallback below
     }
 
-    if (!data.claims.sub) {
-      throw new Error('Unauthorized: No user ID found in token');
+    if (!userId) {
+      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      if (userError || !userData?.user?.id) {
+        console.error('[Supabase] Token validation failed:', userError?.message);
+        throw new Error('Unauthorized: Invalid token');
+      }
+      userId = userData.user.id;
+      claims = {
+        sub: userData.user.id,
+        email: userData.user.email,
+        role: userData.user.role,
+      };
     }
 
     return next({
       context: {
         supabase,
-        userId: data.claims.sub,
-        claims: data.claims,
+        userId,
+        claims: claims as never,
       },
     });
   },
