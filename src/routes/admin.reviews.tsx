@@ -30,6 +30,10 @@ function AdminReviewsPage() {
   const [reviewComment, setReviewComment] = useState("");
   const [reviewFileUrls, setReviewFileUrls] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<"genehmigt" | "abgelehnt" | null>(null);
+  const [bulkComment, setBulkComment] = useState("");
+  const [bulkRunning, setBulkRunning] = useState(false);
 
   const reviewable = assignments.filter((a) => {
     const isReviewable = ["eingereicht", "in_pruefung", "genehmigt", "abgelehnt", "nachbesserung"].includes(a.status);
@@ -37,6 +41,56 @@ function AdminReviewsPage() {
     if (filterStatus && filterStatus !== "all" && a.status !== filterStatus) return false;
     return true;
   });
+
+  const isSelectable = (status: string) => ["eingereicht", "in_pruefung", "nachbesserung"].includes(status);
+  const selectableRows = reviewable.filter((a) => isSelectable(a.status));
+  const selectedRows = selectableRows.filter((a) => selectedIds.has(a.id));
+  const allSelected = selectableRows.length > 0 && selectedRows.length === selectableRows.length;
+
+  const toggleRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(selectableRows.map((a) => a.id)));
+  };
+
+  const runBulk = async () => {
+    const decision = bulkAction;
+    if (!decision || selectedRows.length === 0) return;
+    setBulkRunning(true);
+    let ok = 0, failed = 0;
+    for (const a of selectedRows) {
+      const { error } = await supabase.from("task_assignments")
+        .update({ status: decision, admin_comment: bulkComment || null })
+        .eq("id", a.id);
+      if (error) { failed++; continue; }
+      if (decision === "genehmigt") {
+        const tpl = templates.find((t) => t.id === a.task_template_id);
+        if (tpl && tpl.compensation > 0) {
+          await supabase.from("user_transactions").insert({
+            user_id: a.user_id, assignment_id: a.id, amount: tpl.compensation, status: "genehmigt",
+          });
+        }
+      }
+      ok++;
+    }
+    setBulkRunning(false);
+    setBulkAction(null);
+    setBulkComment("");
+    setSelectedIds(new Set());
+    const verb = decision === "genehmigt" ? "genehmigt" : "abgelehnt";
+    toast(
+      failed > 0
+        ? { title: `${ok} ${verb}, ${failed} fehlgeschlagen`, variant: "destructive" as const }
+        : { title: `${ok} ${ok === 1 ? "Einreichung" : "Einreichungen"} ${verb}` },
+    );
+    loadData();
+  };
+
 
   const openReview = async (assignment: AssignmentRow) => {
     setReviewAssignment(assignment); setReviewComment("");
