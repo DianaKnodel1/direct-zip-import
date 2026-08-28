@@ -127,7 +127,7 @@ export default function FloatingChat() {
         .select("*", { count: "exact", head: true })
         .eq("receiver_id", user.id)
         .eq("read", false)
-        .eq("is_system", false)
+        
         .not("message", "ilike", "[ESCALATE]%")
         .not("message", "ilike", "🤖 KI-Eskalation%")
         .not("message", "ilike", "🤖 KI Eskalation%");
