@@ -85,3 +85,16 @@ export function slugifyLabel(label: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
+
+/** Generischer Spalten-Export (bestehende Nutzung, z. B. Transaktionen). */
+export function exportToCsv<T extends Record<string, any>>(
+  filename: string,
+  rows: T[],
+  columns: { key: keyof T & string; label: string }[],
+) {
+  const csv = toCsv(
+    columns.map(c => c.label),
+    rows.map(r => columns.map(c => (r[c.key] === null || r[c.key] === undefined ? "" : String(r[c.key])))),
+  );
+  downloadCsv(filename, csv);
+}
