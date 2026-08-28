@@ -9,13 +9,14 @@ import { useAdminData, type AssignmentRow, type SubmissionRow, type SubmissionAn
 import { TASK_STATUS_CONFIG, statusBadgeClass, type TaskAssignmentStatus } from "@/lib/status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
-import { CheckCircle2, XCircle, CheckSquare, FileText, Download } from "lucide-react";
+import { CheckCircle2, XCircle, CheckSquare, FileText, Download, Loader2 } from "lucide-react";
 import { TableSkeleton, PageHeaderSkeleton } from "@/components/SkeletonLoaders";
 
 function AdminReviewsPage() {
