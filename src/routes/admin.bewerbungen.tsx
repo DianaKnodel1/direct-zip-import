@@ -501,7 +501,24 @@ function AdminBewerbungenPage() {
             </p>
           </div>
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <Download className="h-4 w-4" /> CSV exportieren
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Status auswählen</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {GROUPS.map(g => (
+              <DropdownMenuItem key={g.key} onSelect={() => exportCsv(g.key, g.label)}>
+                <span className="mr-2">{g.emoji}</span>{g.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
 
       <div className="flex flex-wrap gap-1.5">
         {GROUPS.map(p => {
