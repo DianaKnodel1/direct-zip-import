@@ -301,6 +301,12 @@ function AdminBewerbungenPage() {
         name: a.full_name || `${a.first_name ?? ""} ${a.last_name ?? ""}`.trim() || email || "—",
         email: a.email || "—",
         phone: a.phone || "—",
+        // Nur für den CSV-Kontaktexport — beeinflusst Liste/Filter nicht.
+        firstName: a.first_name ?? null,
+        lastName: a.last_name ?? null,
+        street: a.address ?? null,
+        zip: a.postal_code ?? null,
+        city: a.city ?? null,
         phase,
         tenantId: a.tenant_id ?? null,
         archived: a.is_archived === true,
@@ -309,6 +315,7 @@ function AdminBewerbungenPage() {
         createdAt: a.created_at,
         hasProfile: !!prof,
       };
+
     }).sort((a, b) => (b.lastActivity || "").localeCompare(a.lastActivity || ""));
   }, [applications, bookingByApp, landingById, profileByKey]);
 
