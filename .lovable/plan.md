@@ -1,56 +1,66 @@
-# Migrations-Ausgabe fehlt im Deploy-Log
+# Diagnose: Chat-Badge zeigt „5", obwohl nichts ungelesen ist
 
-## Beobachtung
+Keine Änderungen vorgenommen. Reine Analyse.
 
-Im letzten Deploy-Log auf dem Frontend-Server bricht die Ausgabe direkt nach dem Vite-Build ab (`✔ You can preview this build...` / `▶ Restart… ▶ Healthcheck…`). Es fehlt komplett:
+## Kurzfassung der Ursache
 
-- `▸ 3/5  release activation`
-- `▸ 4/5  migrations` inkl. „Applying …" pro `.sql`
-- `▸ 5/5  restart`
-- `✓ Deploy finished`
+Der Badge zählt **mehr Nachrichten als die Chat-Oberfläche überhaupt anzeigt**. Interne System-/KI-Eskalations-Nachrichten (und Nachrichten von anderen Admin-Konten) werden in allen Listen ausgeblendet, aber im Badge mitgezählt. Da sie nie in einem Gespräch geöffnet werden können, werden sie auch nie auf `read = true` gesetzt — die Zahl bleibt dauerhaft stehen (z. B. „5").
 
-Das sind exakt die Stufen aus `scripts/deploy.sh` (das Skript, das früher die Migrations-Ausgabe erzeugt hat).
+## 1./2./3. Wo die Zahl berechnet wird
 
-## Wahrscheinliche Ursache
+Es gibt **kein React Query und keine gemeinsame Quelle**. Vier unabhängige Zähler:
 
-Auf dem Server wird gerade **nicht** `scripts/deploy.sh` ausgeführt, sondern ein anderes `deploy.sh` (z.B. `/opt/apps/portal/deploy.sh`). Hinweise:
+| Ort | Abfrage |
+|---|---|
+| `src/hooks/use-admin-badges.ts:21-25` (Sidebar/Header-Badge) | `chat_messages`, `count exact`, `receiver_id = user.id AND read = false` |
+| `src/components/FloatingChat.tsx:124-130` (schwebendes Widget) | identisch |
+| `src/routes/admin.chat.tsx:144-148` (`totalUnread`, Summe der Gesprächs-Badges) | aus RPC `list_chat_conversations` |
+| RPC `list_chat_conversations` (`supabase/manual-migrations/20260901000000_...sql:22-52`) | `COUNT(*) FILTER (WHERE sender_id = partner_id AND read = false)`, **mit** Ausschluss von `🤖 KI-Eskalation%`, `[ESCALATE]%` und Admin-Partnern |
+| `NotificationBell.tsx:40` | andere Tabelle (`notifications`), unabhängig |
 
-- Im vorherigen Fehler kam `deploy.sh: line 17: ... bun run build` — `scripts/deploy.sh` hat in Zeile 17 aber `log()`-Definitionen, kein `bun run build`.
-- Die Ausgabe endet mit `▶ Restart… ▶ Healthcheck…` — das sind Nitro/Wrangler-Post-Hooks, nicht unsere `log`-Zeilen.
-- Damit läuft der ganze Block „4/5 migrations" nie an, und die `manual-migrations/*.sql` werden nicht gegen den Backend-DB gespielt → keine Ausgabe, kein State-Update in `.deploy-migrations-applied`.
+Tabelle: `public.chat_messages`, Spalten `receiver_id`, `sender_id`, `read` (boolean, kein `read_at`), `message`, `is_system` (existiert, wird von den Zählern **nicht** genutzt).
 
-Zusätzlich möglich, aber sekundär: selbst wenn `scripts/deploy.sh` liefe, würde der Migrations-Block still übersprungen, wenn
-- `TARGET_DB_URL` in `.env`/`.env.server` fehlt, oder
-- Port `5432` auf `190.97.167.123` vom Frontend-Server nicht erreichbar ist und `scripts/sync-to-backend.sh` fehlt.
+## 4./5. Empfänger-Trennung und eigene Nachrichten
 
-## Plan
+Beides korrekt: `receiver_id = user.id` schließt selbst gesendete Nachrichten automatisch aus; die RPC zählt nur `sender_id = partner_id`.
 
-1. **Auf dem Frontend-Server prüfen, welches Skript wirklich läuft** und ob das erwartete Skript existiert:
+## 6. Mark-as-read
 
-   ```bash
-   ls -la /opt/apps/portal/deploy.sh /opt/apps/portal/scripts/deploy.sh 2>/dev/null
-   head -20 /opt/apps/portal/deploy.sh 2>/dev/null
-   ```
+- Mitarbeiter: `src/routes/_employee/chat.tsx:128-132` setzt beim Laden **alle** eigenen ungelesenen Nachrichten auf `read = true` — vollständig.
+- Admin: `src/routes/admin.chat.tsx:360-362` setzt nur `sender_id = <geöffneter Mitarbeiter> AND read = false`. **Nachrichten, die zu keinem sichtbaren Gespräch gehören (Systemnotizen, Admin-zu-Admin), können nie gelesen markiert werden.**
 
-   - Wenn `/opt/apps/portal/deploy.sh` ein eigenes Mini-Skript ist → das ist der Grund. Fix: dieses File durch einen Wrapper ersetzen, der `scripts/deploy.sh` aufruft (oder direkt `bash scripts/deploy.sh` statt `bash deploy.sh` verwenden).
+## 7. Cache / Polling
 
-2. **Migrations-Voraussetzungen verifizieren** (nur nötig, sobald wieder `scripts/deploy.sh` läuft):
+Kein React Query, kein staleTime. `use-admin-badges.ts:45-57` lädt neu per Realtime-Subscription auf `chat_messages` plus `setInterval(load, 60_000)`. Ein rein „veralteter Cache" scheidet damit als Ursache aus — die 5 ist **real in der Datenbank vorhanden**, nur nicht sichtbar/markierbar.
 
-   ```bash
-   grep -E '^(TARGET_DB_URL|SUPABASE_URL)=' /opt/apps/portal/.env* 2>/dev/null
-   nc -z -w 2 190.97.167.123 5432 && echo "DB reachable" || echo "DB NOT reachable"
-   ls /opt/apps/portal/supabase/manual-migrations/*.sql | wc -l
-   cat /opt/apps/portal/.deploy-migrations-applied 2>/dev/null | tail
-   ```
+## 8. Gleiche Quelle?
 
-3. **Deploy erneut ausführen** mit dem richtigen Skript:
+Nein. Sidebar-Badge (`use-admin-badges`) und Chat-Seite (`totalUnread` aus RPC) rechnen unterschiedlich — genau daher die Diskrepanz „Badge 5 / Chatliste 0". Zusätzlich hat `FloatingChat` einen dritten eigenen Zähler.
 
-   ```bash
-   cd /opt/apps/portal && bash scripts/deploy.sh
-   ```
+## 9. Gegenüberstellung Testperson
 
-   Ausgabe sollte wieder `▸ 4/5  migrations` inkl. `· Applying …` zeigen. Wenn nichts „Applied" wird, sind entweder alle SQLs bereits in `.deploy-migrations-applied` als angewendet markiert (dann ist das korrekt — nichts Neues), oder der `nc`-Check schlägt fehl und wir fallen auf `sync-to-backend.sh` zurück.
+In dieser Umgebung steht kein SQL-Zugriff auf das selbst gehostete Backend zur Verfügung, deshalb noch nicht gegen echte Daten geprüft. Verifizierender Query (nur lesend, von dir auszuführen):
 
-## Warum kein Code-Change nötig
+```sql
+select id, sender_id, left(message, 40) as msg, is_system, created_at
+from public.chat_messages
+where receiver_id = '<USER_ID>' and read = false
+order by created_at desc;
+```
 
-Der Fix ist rein operativ (falsches Skript wird aufgerufen bzw. `TARGET_DB_URL`/Netzwerkzugang prüfen). Erst wenn Punkt 1 klar zeigt, dass `scripts/deploy.sh` tatsächlich läuft und die Migrations trotzdem nicht ausgegeben werden, ergänzen wir Logging (z.B. echo, wie viele `.sql` gefunden wurden, bevor die Schleife startet).
+Erwartung laut Analyse: 5 Zeilen, alle mit `[ESCALATE]`/`🤖 KI-Eskalation`-Präfix oder von einem Admin-Konto als Absender.
+
+## 10. Ähnliches Risiko bei anderen Kennzahlen
+
+Ja, zwei Muster:
+
+- **Definitions-Abweichung:** `use-admin-badges.ts:29` zählt KYC nur `status = 'eingereicht'`, `admin.index.tsx:24` dagegen `('eingereicht','in_pruefung')`. Ebenso Bewerbungen: `'neu'` vs. `('neu','eingegangen')`.
+- **Kein Invalidieren:** `AdminDataContext` (`:253-255`) lädt einmalig beim Mount, ohne Polling/Realtime — Dashboard-Kacheln bleiben nach Aktionen bis zum Reload stehen.
+
+## Empfohlene minimale Korrektur (noch nicht umgesetzt)
+
+Ein Eingriff, eine Datei: in `src/hooks/use-admin-badges.ts` die Chat-Zählung an die Logik der Gesprächsliste angleichen — Systemnotizen ausschließen, z. B. per `.eq("is_system", false)` bzw. `.not("message","like","[ESCALATE]%")` etc. Optional identisch in `FloatingChat.tsx:124-130`.
+
+Alternative (sauberer, aber DB-Änderung): eine RPC `count_unread_chat()` als einzige Quelle für alle Badges.
+
+Nach Freigabe setze ich nur die Variante um, die du wählst.
