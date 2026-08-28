@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/EmptyState";
-import { Users, Search, ExternalLink, Check, X, Trash2, UserPlus, Copy, MessageCircle } from "lucide-react";
+import { Users, Search, ExternalLink, Check, X, Trash2, UserPlus, Copy, MessageCircle, Download } from "lucide-react";
+import { contactRowsToCsv, downloadCsv, splitName, dateStamp } from "@/lib/csv-export";
+
 import { TableSkeleton, PageHeaderSkeleton } from "@/components/SkeletonLoaders";
 import { STATUS_CONFIG, ONBOARDING_STATUS_CONFIG, type EmployeeStatus } from "@/lib/status";
 import { StageTimeline, type Stage } from "@/components/StageTimeline";
@@ -58,6 +60,12 @@ function AdminMitarbeiterPage() {
           // Die echte Adresse steht im Login-Konto; Bewerbung nur als Rückfall.
           email: (p.user_id && userEmails.get(p.user_id)) || app?.email || "—",
           phone: p.phone || app?.phone || "—",
+          // Nur für den CSV-Kontaktexport — beeinflusst Liste/Filter nicht.
+          firstName: app?.first_name ?? null,
+          lastName: app?.last_name ?? null,
+          street: p.street || p.address || app?.address || null,
+          zip: p.zip_code || app?.postal_code || null,
+          city: p.city || app?.city || null,
           status: p.status as EmployeeStatus,
           onboarding: p.onboarding_status as keyof typeof ONBOARDING_STATUS_CONFIG,
           createdAt: p.created_at,
@@ -68,6 +76,7 @@ function AdminMitarbeiterPage() {
             p.onboarding_status === "abgeschlossen"
           ),
         };
+
       })
       .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   }, [applications, profiles, kycList, adminUserIds, userEmails]);
@@ -112,6 +121,28 @@ function AdminMitarbeiterPage() {
     });
   }, [rows, q, tab]);
   const pagination = usePagination(filtered, 50);
+
+  function exportCsv() {
+    if (filtered.length === 0) {
+      toast.error("Keine Datensätze zum Exportieren vorhanden.");
+      return;
+    }
+    const csv = contactRowsToCsv(filtered.map(r => {
+      const split = splitName(r.name);
+      return {
+        firstName: r.firstName || split.firstName,
+        lastName: r.lastName || split.lastName,
+        email: r.email,
+        phone: r.phone,
+        street: r.street,
+        zip: r.zip,
+        city: r.city,
+        country: "",
+      };
+    }));
+    downloadCsv(`mitarbeiter-${dateStamp()}.csv`, csv);
+  }
+
 
   const allVisibleSelected = filtered.length > 0 && filtered.every(r => selected.has(r.id));
   const toggleAllVisible = () => {
@@ -180,7 +211,11 @@ function AdminMitarbeiterPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCsv}>
+            <Download className="h-4 w-4" /> CSV exportieren
+          </Button>
           <PurgeButton />
+
           <div className="relative w-72">
             <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Name, E-Mail, Telefon…" value={q} onChange={e => setQ(e.target.value)} className="pl-9" />

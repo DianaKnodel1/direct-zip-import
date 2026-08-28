@@ -9,7 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/EmptyState";
-import { Users, Search, ExternalLink, Trash2, Archive, MessageCircle } from "lucide-react";
+import { Users, Search, ExternalLink, Trash2, Archive, MessageCircle, Download } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { contactRowsToCsv, downloadCsv, splitName, dateStamp, slugifyLabel } from "@/lib/csv-export";
+
 import { TableSkeleton, PageHeaderSkeleton } from "@/components/SkeletonLoaders";
 import { StageTimeline, type Stage } from "@/components/StageTimeline";
 import { deleteOrphanApplications, deleteApplication, bulkDeleteApplications } from "@/lib/admin-delete.functions";
@@ -301,6 +307,12 @@ function AdminBewerbungenPage() {
         name: a.full_name || `${a.first_name ?? ""} ${a.last_name ?? ""}`.trim() || email || "—",
         email: a.email || "—",
         phone: a.phone || "—",
+        // Nur für den CSV-Kontaktexport — beeinflusst Liste/Filter nicht.
+        firstName: a.first_name ?? null,
+        lastName: a.last_name ?? null,
+        street: a.address ?? null,
+        zip: a.postal_code ?? null,
+        city: a.city ?? null,
         phase,
         tenantId: a.tenant_id ?? null,
         archived: a.is_archived === true,
@@ -309,6 +321,7 @@ function AdminBewerbungenPage() {
         createdAt: a.created_at,
         hasProfile: !!prof,
       };
+
     }).sort((a, b) => (b.lastActivity || "").localeCompare(a.lastActivity || ""));
   }, [applications, bookingByApp, landingById, profileByKey]);
 
@@ -344,10 +357,12 @@ function AdminBewerbungenPage() {
     return c;
   }, [scoped]);
 
-  const filtered = useMemo(() => {
+  // Eine einzige Filterfunktion für Liste UND Export — nur die Statusgruppe
+  // wird beim Export durch die Auswahl im Menü ersetzt.
+  const filterByGroup = useMemo(() => {
     const ql = q.trim().toLowerCase();
-    return scoped.filter(r => {
-      if (tab !== "alle" && groupOf(r.phase) !== tab) return false;
+    return (groupKey: string) => scoped.filter(r => {
+      if (groupKey !== "alle" && groupOf(r.phase) !== groupKey) return false;
       if (!ql) return true;
       return (
         r.name?.toLowerCase().includes(ql) ||
@@ -357,8 +372,33 @@ function AdminBewerbungenPage() {
         (r.source?.to ?? "").toLowerCase().includes(ql)
       );
     });
-  }, [scoped, tab, q]);
+  }, [scoped, q]);
+
+  const filtered = useMemo(() => filterByGroup(tab), [filterByGroup, tab]);
   const pagination = usePagination(filtered, 50);
+
+  function exportCsv(groupKey: string, label: string) {
+    const rowsToExport = filterByGroup(groupKey);
+    if (rowsToExport.length === 0) {
+      toast.error("Keine Datensätze zum Exportieren vorhanden.");
+      return;
+    }
+    const csv = contactRowsToCsv(rowsToExport.map(r => {
+      const split = splitName(r.name);
+      return {
+        firstName: r.firstName || split.firstName,
+        lastName: r.lastName || split.lastName,
+        email: r.email,
+        phone: r.phone,
+        street: r.street,
+        zip: r.zip,
+        city: r.city,
+        country: "",
+      };
+    }));
+    downloadCsv(`bewerber-${slugifyLabel(label)}-${dateStamp()}.csv`, csv);
+  }
+
 
   const orphanCandidates = useMemo(() => {
     const cutoff = Date.now() - cleanupDays * 86_400_000;
@@ -467,7 +507,24 @@ function AdminBewerbungenPage() {
             </p>
           </div>
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <Download className="h-4 w-4" /> CSV exportieren
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Status auswählen</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {GROUPS.map(g => (
+              <DropdownMenuItem key={g.key} onSelect={() => exportCsv(g.key, g.label)}>
+                <span className="mr-2">{g.emoji}</span>{g.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
 
       <div className="flex flex-wrap gap-1.5">
         {GROUPS.map(p => {
