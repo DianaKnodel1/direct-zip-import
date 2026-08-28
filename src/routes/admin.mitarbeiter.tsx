@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/EmptyState";
-import { Users, Search, ExternalLink, Check, X, Trash2, UserPlus, Copy, MessageCircle } from "lucide-react";
+import { Users, Search, ExternalLink, Check, X, Trash2, UserPlus, Copy, MessageCircle, Download } from "lucide-react";
+import { contactRowsToCsv, downloadCsv, splitName, dateStamp } from "@/lib/csv-export";
+
 import { TableSkeleton, PageHeaderSkeleton } from "@/components/SkeletonLoaders";
 import { STATUS_CONFIG, ONBOARDING_STATUS_CONFIG, type EmployeeStatus } from "@/lib/status";
 import { StageTimeline, type Stage } from "@/components/StageTimeline";
