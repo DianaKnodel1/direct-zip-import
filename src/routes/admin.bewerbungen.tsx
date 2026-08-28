@@ -351,10 +351,12 @@ function AdminBewerbungenPage() {
     return c;
   }, [scoped]);
 
-  const filtered = useMemo(() => {
+  // Eine einzige Filterfunktion für Liste UND Export — nur die Statusgruppe
+  // wird beim Export durch die Auswahl im Menü ersetzt.
+  const filterByGroup = useMemo(() => {
     const ql = q.trim().toLowerCase();
-    return scoped.filter(r => {
-      if (tab !== "alle" && groupOf(r.phase) !== tab) return false;
+    return (groupKey: string) => scoped.filter(r => {
+      if (groupKey !== "alle" && groupOf(r.phase) !== groupKey) return false;
       if (!ql) return true;
       return (
         r.name?.toLowerCase().includes(ql) ||
@@ -364,8 +366,33 @@ function AdminBewerbungenPage() {
         (r.source?.to ?? "").toLowerCase().includes(ql)
       );
     });
-  }, [scoped, tab, q]);
+  }, [scoped, q]);
+
+  const filtered = useMemo(() => filterByGroup(tab), [filterByGroup, tab]);
   const pagination = usePagination(filtered, 50);
+
+  function exportCsv(groupKey: string, label: string) {
+    const rowsToExport = filterByGroup(groupKey);
+    if (rowsToExport.length === 0) {
+      toast.error("Keine Datensätze zum Exportieren vorhanden.");
+      return;
+    }
+    const csv = contactRowsToCsv(rowsToExport.map(r => {
+      const split = splitName(r.name);
+      return {
+        firstName: r.firstName || split.firstName,
+        lastName: r.lastName || split.lastName,
+        email: r.email,
+        phone: r.phone,
+        street: r.street,
+        zip: r.zip,
+        city: r.city,
+        country: "",
+      };
+    }));
+    downloadCsv(`bewerber-${slugifyLabel(label)}-${dateStamp()}.csv`, csv);
+  }
+
 
   const orphanCandidates = useMemo(() => {
     const cutoff = Date.now() - cleanupDays * 86_400_000;
