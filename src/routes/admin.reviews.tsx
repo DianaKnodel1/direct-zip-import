@@ -9,13 +9,14 @@ import { useAdminData, type AssignmentRow, type SubmissionRow, type SubmissionAn
 import { TASK_STATUS_CONFIG, statusBadgeClass, type TaskAssignmentStatus } from "@/lib/status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
-import { CheckCircle2, XCircle, CheckSquare, FileText, Download } from "lucide-react";
+import { CheckCircle2, XCircle, CheckSquare, FileText, Download, Loader2 } from "lucide-react";
 import { TableSkeleton, PageHeaderSkeleton } from "@/components/SkeletonLoaders";
 
 function AdminReviewsPage() {
@@ -29,6 +30,10 @@ function AdminReviewsPage() {
   const [reviewComment, setReviewComment] = useState("");
   const [reviewFileUrls, setReviewFileUrls] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<"genehmigt" | "abgelehnt" | null>(null);
+  const [bulkComment, setBulkComment] = useState("");
+  const [bulkRunning, setBulkRunning] = useState(false);
 
   const reviewable = assignments.filter((a) => {
     const isReviewable = ["eingereicht", "in_pruefung", "genehmigt", "abgelehnt", "nachbesserung"].includes(a.status);
@@ -36,6 +41,56 @@ function AdminReviewsPage() {
     if (filterStatus && filterStatus !== "all" && a.status !== filterStatus) return false;
     return true;
   });
+
+  const isSelectable = (status: string) => ["eingereicht", "in_pruefung", "nachbesserung"].includes(status);
+  const selectableRows = reviewable.filter((a) => isSelectable(a.status));
+  const selectedRows = selectableRows.filter((a) => selectedIds.has(a.id));
+  const allSelected = selectableRows.length > 0 && selectedRows.length === selectableRows.length;
+
+  const toggleRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(selectableRows.map((a) => a.id)));
+  };
+
+  const runBulk = async () => {
+    const decision = bulkAction;
+    if (!decision || selectedRows.length === 0) return;
+    setBulkRunning(true);
+    let ok = 0, failed = 0;
+    for (const a of selectedRows) {
+      const { error } = await supabase.from("task_assignments")
+        .update({ status: decision, admin_comment: bulkComment || null })
+        .eq("id", a.id);
+      if (error) { failed++; continue; }
+      if (decision === "genehmigt") {
+        const tpl = templates.find((t) => t.id === a.task_template_id);
+        if (tpl && tpl.compensation > 0) {
+          await supabase.from("user_transactions").insert({
+            user_id: a.user_id, assignment_id: a.id, amount: tpl.compensation, status: "genehmigt",
+          });
+        }
+      }
+      ok++;
+    }
+    setBulkRunning(false);
+    setBulkAction(null);
+    setBulkComment("");
+    setSelectedIds(new Set());
+    const verb = decision === "genehmigt" ? "genehmigt" : "abgelehnt";
+    toast(
+      failed > 0
+        ? { title: `${ok} ${verb}, ${failed} fehlgeschlagen`, variant: "destructive" as const }
+        : { title: `${ok} ${ok === 1 ? "Einreichung" : "Einreichungen"} ${verb}` },
+    );
+    loadData();
+  };
+
 
   const openReview = async (assignment: AssignmentRow) => {
     setReviewAssignment(assignment); setReviewComment("");
@@ -82,7 +137,7 @@ function AdminReviewsPage() {
           <h1 className="text-lg font-heading font-bold text-foreground">Prüfungen</h1>
           <p className="text-xs text-muted-foreground">{reviewable.length} Einreichungen</p>
         </div>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
+        <Select value={filterStatus} onValueChange={(v) => { setFilterStatus(v); setSelectedIds(new Set()); }}>
           <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="Alle Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Alle Status</SelectItem>
@@ -95,6 +150,21 @@ function AdminReviewsPage() {
         </Select>
       </div>
 
+      {selectedRows.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+          <p className="text-xs font-medium text-foreground">{selectedRows.length} ausgewählt</p>
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" className="h-7 text-xs" onClick={() => { setBulkComment(""); setBulkAction("genehmigt"); }}>
+              <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Genehmigen
+            </Button>
+            <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => { setBulkComment(""); setBulkAction("abgelehnt"); }}>
+              <XCircle className="h-3.5 w-3.5 mr-1" /> Ablehnen
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>Auswahl aufheben</Button>
+          </div>
+        </div>
+      )}
+
       {reviewable.length === 0 ? (
         <EmptyState icon={CheckSquare} title="Keine Einreichungen" description="Es gibt aktuell keine Einreichungen zur Prüfung." />
       ) : (
@@ -102,6 +172,14 @@ function AdminReviewsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
+                <th className="w-10 px-4 py-2.5">
+                  <Checkbox
+                    checked={allSelected}
+                    disabled={selectableRows.length === 0}
+                    onCheckedChange={toggleAll}
+                    aria-label="Alle auswählen"
+                  />
+                </th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Aufgabe</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Mitarbeiter</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
@@ -114,6 +192,14 @@ function AdminReviewsPage() {
                 const profile = getProfileForUser(a.user_id);
                 return (
                   <tr key={a.id} className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => openReview(a)}>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(a.id)}
+                        disabled={!isSelectable(a.status)}
+                        onCheckedChange={() => toggleRow(a.id)}
+                        aria-label="Einreichung auswählen"
+                      />
+                    </td>
                     <td className="px-4 py-3 font-medium text-foreground">{tpl?.title ?? "Aufgabe"}</td>
                     <td className="px-4 py-3 text-muted-foreground">{profile?.full_name ?? "Unbekannt"}</td>
                     <td className="px-4 py-3">
@@ -133,6 +219,37 @@ function AdminReviewsPage() {
           </table>
         </div>
       )}
+
+      <Dialog open={!!bulkAction} onOpenChange={(o) => { if (!o && !bulkRunning) setBulkAction(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-heading">
+              {selectedRows.length} {selectedRows.length === 1 ? "Einreichung" : "Einreichungen"} {bulkAction === "genehmigt" ? "genehmigen" : "ablehnen"}?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {bulkAction === "genehmigt" && (
+              <p className="text-xs text-muted-foreground">Die jeweilige Vergütung wird gutgeschrieben.</p>
+            )}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Kommentar (optional, für alle)</label>
+              <Textarea value={bulkComment} onChange={(e) => setBulkComment(e.target.value)} placeholder="Kommentar…" rows={2} />
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={bulkRunning} onClick={() => setBulkAction(null)}>Abbrechen</Button>
+            <Button
+              size="sm"
+              variant={bulkAction === "abgelehnt" ? "destructive" : "default"}
+              disabled={bulkRunning}
+              onClick={runBulk}
+            >
+              {bulkRunning ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Verarbeite…</> : "Bestätigen"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       <Dialog open={!!reviewAssignment} onOpenChange={() => setReviewAssignment(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
