@@ -22,7 +22,11 @@ export function useAdminBadges(): AdminBadges {
           .from("chat_messages")
           .select("id", { count: "exact", head: true })
           .eq("receiver_id", user.id)
-          .eq("read", false),
+          .eq("read", false)
+          .eq("is_system", false)
+          .not("message", "ilike", "[ESCALATE]%")
+          .not("message", "ilike", "🤖 KI-Eskalation%")
+          .not("message", "ilike", "🤖 KI Eskalation%"),
         supabase
           .from("kyc_verifications")
           .select("id", { count: "exact", head: true })
