@@ -342,9 +342,6 @@ function injectLandingConfig(html, row) {
   if (!/^https?:\/\//i.test(apiEndpoint)) {
     console.error("[landing] PORTAL_API_ENDPOINT fehlt – Bewerbungsformular kann nicht senden:", row.domain || row.slug);
   }
-  if (!/^https?:\/\//i.test(apiEndpoint)) {
-    console.error("[landing] PORTAL_API_ENDPOINT fehlt – Bewerbungsformular kann nicht senden:", row.domain || row.slug);
-  }
   const portalUrl = row.branding?.portal_url || "";
   const wa = row.branding?.whatsapp_enabled ? String(row.branding?.whatsapp_number || "").replace(/[^0-9]/g, "") : "";
   const cleanHtml = html.replace(/<script>\s*window\.PORTAL_API\s*=\s*[\s\S]*?<\/script>\s*/gi, "");
