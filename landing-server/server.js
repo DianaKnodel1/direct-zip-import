@@ -339,6 +339,9 @@ function injectLandingConfig(html, row) {
   const esc = (s) => String(s || "").replace(/[<>"']/g, (c) => ({ "<": "\\u003c", ">": "\\u003e", '"': '\\"', "'": "\\'" }[c]));
   const rawApi = row.branding?.api_endpoint || PORTAL_API_ENDPOINT;
   const apiEndpoint = String(rawApi || "").trim().replace(/[.,;\s]+$/g, "");
+  if (!/^https?:\/\//i.test(apiEndpoint)) {
+    console.error("[landing] PORTAL_API_ENDPOINT fehlt – Bewerbungsformular kann nicht senden:", row.domain || row.slug);
+  }
   const portalUrl = row.branding?.portal_url || "";
   const wa = row.branding?.whatsapp_enabled ? String(row.branding?.whatsapp_number || "").replace(/[^0-9]/g, "") : "";
   const cleanHtml = html.replace(/<script>\s*window\.PORTAL_API\s*=\s*[\s\S]*?<\/script>\s*/gi, "");
