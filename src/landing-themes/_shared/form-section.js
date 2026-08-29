@@ -434,10 +434,26 @@
       if(window.SOURCE_SLUG)data.source_slug=window.SOURCE_SLUG;
       data.dsgvo_consent=true;
       data.consent_timestamp=new Date().toISOString();
-      fetch(window.PORTAL_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+      var endpoint=String(window.PORTAL_API||'').trim();
+      if(!/^https?:\/\//i.test(endpoint)){
+        // Ohne konfigurierten Portal-Endpunkt würde der POST auf der Landing Page
+        // selbst landen (HTML-Antwort) und fälschlich als Erfolg gelten.
+        try{console.error('[landing] window.PORTAL_API fehlt oder ist ungültig – Bewerbung wurde NICHT übermittelt');}catch(_){}
+        setStatus('error','Das Bewerbungsformular ist aktuell nicht erreichbar. Bitte kontaktieren Sie uns direkt – Ihre Daten wurden nicht übermittelt.');
+        return;
+      }
+      fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
         .then(function(r){
           return r.text().then(function(txt){
             var body=null;try{body=txt?JSON.parse(txt):null;}catch(_){}
+            if(r.ok&&(!body||typeof body!=='object'||body.success!==true)){
+              // Antwort kam nicht vom Portal (z. B. HTML einer Fehlerseite) → kein Erfolg vortäuschen.
+              try{console.error('[landing] unerwartete Antwort vom Bewerbungs-Endpunkt');}catch(_){}
+              var e2=new Error('unexpected_response');
+              e2.userMessage='Ihre Bewerbung konnte nicht übermittelt werden. Bitte versuchen Sie es erneut oder kontaktieren Sie uns direkt.';
+              throw e2;
+            }
+
             if(!r.ok){
               var msg='';
               if(body&&body.details&&body.details.fieldErrors){
