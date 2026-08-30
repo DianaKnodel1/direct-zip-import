@@ -136,6 +136,7 @@ function AdminMitarbeiterPage() {
       toast.error("Keine Datensätze zum Exportieren vorhanden.");
       return;
     }
+    const tenantNameById = new Map(tenants.map(t => [t.id, t.name]));
     const csv = contactRowsToCsv(filtered.map(r => {
       const split = splitName(r.name);
       return {
@@ -147,6 +148,7 @@ function AdminMitarbeiterPage() {
         zip: r.zip,
         city: r.city,
         country: "",
+        tenant: (r.tenantId && tenantNameById.get(r.tenantId)) || "",
       };
     }));
     downloadCsv(`mitarbeiter-${dateStamp()}.csv`, csv);
