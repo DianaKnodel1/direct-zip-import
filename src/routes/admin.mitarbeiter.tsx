@@ -43,6 +43,14 @@ function AdminMitarbeiterPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
   const runBulkDelete = useServerFn(bulkDeleteEmployees);
+  // Nur für den CSV-Export: Mandantenname zur tenant_id.
+  const [tenants, setTenants] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    supabase.from("tenants").select("id, name").order("name").then(({ data }) => {
+      setTenants((data ?? []) as Array<{ id: string; name: string }>);
+    });
+  }, []);
+
 
   const rows = useMemo(() => {
     const appById = new Map((applications as any[]).map((a) => [a.id, a]));
