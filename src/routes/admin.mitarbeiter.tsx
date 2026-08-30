@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useNavigate } from "@/lib/router-compat";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAdminData } from "@/contexts/AdminDataContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
