@@ -29,7 +29,7 @@ import {
 } from "@/lib/cloudflare.functions";
 import { listAutomationLog } from "@/lib/automation-log.functions";
 import { getBackupStatus } from "@/lib/backup-status.functions";
-import { Loader2, Plus, Copy, RefreshCw, Trash2, CheckCircle2, AlertCircle, Power, KeyRound, Cloud, Server, Activity, Database } from "lucide-react";
+import { Loader2, Plus, Copy, RefreshCw, Download, Trash2, CheckCircle2, AlertCircle, Power, KeyRound, Cloud, Server, Activity, Database } from "lucide-react";
 
 
 export const Route = createFileRoute("/admin/infrastructure")({
