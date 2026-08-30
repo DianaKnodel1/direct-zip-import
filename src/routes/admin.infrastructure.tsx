@@ -148,6 +148,14 @@ function ServersTab() {
     } catch (e: any) { toast({ title: "Fehler", description: e.message, variant: "destructive" }); }
   };
 
+  const onSyncNow = async (id: string, name: string) => {
+    try {
+      await syncNow({ data: { id } });
+      toast({ title: "Sofortiger Sync angefordert", description: `${name}: Der Landing-Server zieht sich beim nächsten Heartbeat (≤60s) alle aktuellen Dateien.` });
+      reload();
+    } catch (e: any) { toast({ title: "Fehler", description: e.message, variant: "destructive" }); }
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
