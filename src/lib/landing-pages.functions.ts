@@ -388,15 +388,58 @@ async function setCloudflareARecord(token: string, zoneId: string, zoneDomain: s
   }
 }
 
+/**
+ * Prüft vor dem Löschen, was an der Landing hängt: Buchungskalender und
+ * bereits gebuchte Termine. Termine sind in der DB gegen Löschen geschützt.
+ */
+export const checkLandingPageDeletable = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { data: schedules, error: sErr } = await context.supabase
+      .from("availability_schedules")
+      .select("id")
+      .eq("landing_page_id", data.id);
+    if (sErr) throw new Error(sErr.message);
+    const ids = (schedules ?? []).map((s: any) => s.id);
+    let appointments = 0;
+    if (ids.length > 0) {
+      const { count, error: aErr } = await (context.supabase as any)
+        .from("interview_appointments")
+        .select("id", { count: "exact", head: true })
+        .in("schedule_id", ids);
+      if (aErr) throw new Error(aErr.message);
+      appointments = count ?? 0;
+    }
+    return { schedules: ids.length, appointments };
+  });
+
 export const deleteLandingPage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
+    // Der Kalender hängt per CASCADE an der Landing, gebuchte Termine sind aber
+    // per RESTRICT geschützt. Deshalb Kalender vorher lösen + deaktivieren:
+    // Termine bleiben vollständig erhalten, die Landing kann gelöscht werden.
+    const { error: detachErr } = await context.supabase
+      .from("availability_schedules")
+      .update({ landing_page_id: null, active: false } as any)
+      .eq("landing_page_id", data.id);
+    if (detachErr) throw new Error(detachErr.message);
+
+    // Verknüpfte Fast-Track-Landings verlieren nur die Zuordnung.
+    await (context.supabase as any)
+      .from("landing_pages")
+      .update({ linked_fasttrack_landing_id: null })
+      .eq("linked_fasttrack_landing_id", data.id);
+
     const { error } = await context.supabase.from("landing_pages").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
 
 export const toggleLandingPublished = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
