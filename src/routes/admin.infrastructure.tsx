@@ -17,6 +17,7 @@ import {
   updateLandingServer,
   rotateBootstrapToken,
   requestThemeResync,
+  syncLandingServerNow,
 } from "@/lib/landing-servers.functions";
 import {
   listCloudflareAccounts,
