@@ -257,6 +257,11 @@ function LandingGeneratorPage() {
   const listFn = useServerFn(listLandingPages);
   const getFn = useServerFn(getLandingPage);
   const delFn = useServerFn(deleteLandingPage);
+  const checkDelFn = useServerFn(checkLandingPageDeletable);
+  const [deleteTarget, setDeleteTarget] = useState<
+    { id: string; domain: string; schedules: number; appointments: number } | null
+  >(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const toggleFn = useServerFn(toggleLandingPublished);
   const setPortalThemeFn = useServerFn(setTenantPortalTheme);
 
