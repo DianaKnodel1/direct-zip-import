@@ -566,6 +566,10 @@ function AdminTenantsPage() {
   const [editTenant, setEditTenant] = useState<Tenant | undefined>();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [switchTenant, setSwitchTenant] = useState<Tenant | undefined>();
+  const [forceDelete, setForceDelete] = useState<
+    { id: string; name: string; blocking: string[]; confirmText: string } | null
+  >(null);
+  const [forceBusy, setForceBusy] = useState(false);
   const { toast } = useToast();
   const setDnsFn = useServerFn(setLandingDnsRecord);
   const { data: readiness, loading: readinessLoading, reload: reloadReadiness } = useTenantReadiness();
