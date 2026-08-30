@@ -846,7 +846,52 @@ function AdminTenantsPage() {
         onOpenChange={(v) => { if (!v) setReadinessTenantId(null); }}
         onRefresh={reloadReadiness}
       />
+
+      <Dialog open={!!forceDelete} onOpenChange={(o) => { if (!o && !forceBusy) setForceDelete(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-4 w-4" /> Mandant „{forceDelete?.name}" löschen
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>Mit diesem Mandanten sind noch verknüpft:</p>
+            <ul className="list-disc pl-5 text-muted-foreground">
+              {forceDelete?.blocking.map((b) => <li key={b}>{b}</li>)}
+            </ul>
+            <p className="rounded border border-border bg-muted/40 p-2 text-xs">
+              <strong>Empfehlung: Deaktivieren.</strong> Der Mandant ist dann offline, alle Daten und die
+              Historie bleiben zugeordnet und wiederherstellbar.
+            </p>
+            <p className="rounded border border-destructive/40 bg-destructive/5 p-2 text-xs">
+              <strong>Trotzdem löschen:</strong> Die oben genannten Datensätze werden <em>nicht</em> gelöscht,
+              verlieren aber dauerhaft die Mandantenzuordnung (sie erscheinen danach ohne Mandant).
+              Das lässt sich nicht rückgängig machen.
+            </p>
+            <div className="space-y-1">
+              <Label className="text-xs">Zum Bestätigen Mandantennamen eingeben</Label>
+              <Input
+                value={forceDelete?.confirmText ?? ""}
+                placeholder={forceDelete?.name}
+                onChange={(e) => setForceDelete((p) => p && { ...p, confirmText: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
+            <Button variant="ghost" disabled={forceBusy} onClick={() => setForceDelete(null)}>Abbrechen</Button>
+            <Button variant="outline" disabled={forceBusy} onClick={deactivateFromForceDialog}>Deaktivieren</Button>
+            <Button
+              variant="destructive"
+              disabled={forceBusy || forceDelete?.confirmText.trim() !== forceDelete?.name}
+              onClick={runForceDelete}
+            >
+              {forceBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Trotzdem löschen"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
 
