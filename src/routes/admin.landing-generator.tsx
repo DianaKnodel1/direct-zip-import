@@ -1766,8 +1766,48 @@ document.addEventListener('submit', function(e){
           </div>
         </div>
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Landing „{deleteTarget?.domain}" löschen?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                {deleteTarget && deleteTarget.appointments > 0 ? (
+                  <p>
+                    Diese Landing hat einen Buchungskalender mit <strong>{deleteTarget.appointments} gebuchten Terminen</strong>.
+                    Die Termine <strong>bleiben erhalten</strong> und weiterhin unter „Mitarbeiter-Termine" sichtbar –
+                    der Kalender wird nur von der Landing gelöst und deaktiviert.
+                  </p>
+                ) : (
+                  <p>Es hängen keine gebuchten Termine an dieser Landing.</p>
+                )}
+                <p>
+                  Nach dem Löschen ist die Domain nicht mehr erreichbar (404). Bewerbungen bleiben erhalten,
+                  verlieren aber den Herkunfts-Verweis. Theme, Slots und Branding dieser Landing sind
+                  <strong> nicht wiederherstellbar</strong>. Der DNS-Eintrag bleibt bestehen.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteBusy}>Abbrechen</AlertDialogCancel>
+            <Button variant="outline" disabled={deleteBusy} onClick={deactivateFromDialog}>
+              Nur deaktivieren
+            </Button>
+            <AlertDialogAction
+              disabled={deleteBusy}
+              onClick={(e) => { e.preventDefault(); confirmDelete(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteBusy ? "Lösche…" : "Löschen (Termine behalten)"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
+
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
