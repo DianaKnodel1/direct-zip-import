@@ -1,51 +1,63 @@
-# Landing-Page-Löschen entschärfen + Mandant im CSV-Export
+# Löschen erzwingen (Landing Page & Mandant) + Mandant im CSV-Export
 
-## Teil 1 — Warum das Löschen fehlschlägt
+## Teil 1 — Warum das Löschen aktuell blockiert
 
-**Screenshot 1 (Landing Page löschen):**
-Die Fehlermeldung kommt direkt aus der Datenbank:
-`update or delete on table "availability_schedules" violates foreign key constraint "interview_appointments_schedule_id_fkey"`.
+**Landing Page (Screenshot 1):** Die Datenbank meldet
+`... "availability_schedules" violates foreign key constraint "interview_appointments_schedule_id_fkey"`.
 
-Kette:
 ```text
-landing_pages  --(löschen kaskadiert)-->  availability_schedules (Terminkalender der Landing)
-availability_schedules  <--(gesperrt: ON DELETE RESTRICT)--  interview_appointments (gebuchte Termine)
+landing_pages  --(löschen kaskadiert)-->  availability_schedules (Buchungskalender)
+availability_schedules  <--(gesperrt)--   interview_appointments (gebuchte Termine)
 ```
-Die Landing-Page hat einen Buchungskalender, und zu diesem Kalender existieren bereits gebuchte Interview-Termine. Die Termine sind bewusst gegen Löschen geschützt (Historie), deshalb bricht die ganze Löschung ab. Es ist also kein Bug im Code, sondern ein Datenschutz-Mechanismus — aber aktuell ohne verständliche Meldung und ohne Ausweg in der UI.
+Die Landing hat einen Buchungskalender mit bereits gebuchten Terminen. Termine sind gegen Löschen geschützt, deshalb bricht alles ab.
 
-**Screenshot 2 (Mandant löschen):**
-Das ist bereits die gewünschte, freundliche Variante: die App prüft vorher die Verknüpfungen (2 Mitarbeiter, 2 unterschriebene Verträge, 3 Vertragsvorlagen) und erklärt, was zu tun ist. Hier ist nichts kaputt — die Empfehlung „Deaktivieren statt Löschen" ist korrekt.
+**Mandant (Screenshot 2):** Kein Datenbankfehler, sondern eine eingebaute Vorabprüfung: solange Bewerbungen, Mitarbeiter, Verträge, Vertragsvorlagen oder Dokumente am Mandanten hängen, wird gar nicht erst gelöscht.
 
-## Möglichkeiten für die Landing-Page
+## Was passiert, wenn trotzdem gelöscht wird?
 
-1. **Deaktivieren statt löschen** — Landing offline nehmen, alles bleibt erhalten. Sofort möglich, kein Datenverlust, Domain-Eintrag bleibt aber bestehen.
-2. **Löschen und Termine behalten (Empfehlung)** — vor dem Löschen wird der Kalender von der Landing gelöst (Landing-Bezug entfernt, Kalender auf inaktiv). Die gebuchten Termine bleiben vollständig erhalten und weiterhin in „Mitarbeiter-Termine" sichtbar; die Landing verschwindet sauber.
-3. **Alles löschen inkl. Termine** — kompletter Verlust der Terminhistorie dieser Landing. Nicht empfohlen.
+**Landing Page löschen (erzwungen):**
+- Die Landing verschwindet aus dem Generator und ist unter ihrer Domain nicht mehr erreichbar (der Landing-Server findet keinen Eintrag → 404).
+- Der Buchungskalender der Landing wird von ihr gelöst und deaktiviert — **gebuchte Termine bleiben vollständig erhalten** und weiterhin unter „Mitarbeiter-Termine" sichtbar.
+- Bewerbungen, die über diese Landing kamen, bleiben erhalten; nur der Herkunfts-Verweis („kam von Landing X") ist danach leer.
+- Verknüpfte Fast-Track-Landings verlieren die Verknüpfung, laufen aber weiter.
+- Nicht wiederherstellbar: Theme-Konfiguration, Slots, Branding dieser Landing. Der Cloudflare-DNS-Eintrag bleibt bestehen und muss ggf. separat entfernt werden.
 
-**Beste Lösung:** Variante 2 als Standard, mit einem klaren Hinweis-Dialog vorher (nach Vorbild der Mandanten-Meldung), plus „Deaktivieren" als angebotene Alternative im selben Dialog.
+**Mandant löschen (erzwungen):**
+- Alle Daten des Mandanten werden vorher vom Mandanten **gelöst**, nicht gelöscht: Bewerbungen, Mitarbeiterprofile, Verträge, Vertragsvorlagen und Dokumente bleiben bestehen, stehen danach aber ohne Mandantenzuordnung da („kein Mandant").
+- Folge im Alltag: diese Datensätze tauchen in Mandantenfiltern nicht mehr auf, Mandanten-Auswertungen und der neue CSV-Mandantenwert sind für sie leer, E-Mail-Absender/Branding fallen auf die Standardwerte zurück.
+- Endgültig gelöscht werden die mandantengebundenen Einstellungen selbst: SMTP-/Absenderkonfiguration, Chat-FAQ, Bot-Einstellungen, Calendly-Konten, Bounce-/Sperrlisten und Mail-Warteschlangen dieses Mandanten.
+- Nicht rückgängig machbar. Wo nur „aufräumen" gewollt ist, bleibt **Deaktivieren** die bessere Wahl.
 
 ## Umsetzung Teil 1
 
-- Neue Vorabprüfung beim Löschen: zählt Kalender + gebuchte Termine der Landing und liefert diese Zahlen zurück.
-- Löschdialog zeigt bei Treffern: „Diese Landing hat X gebuchte Termine. Die Termine bleiben erhalten, die Landing wird entfernt." mit den Buttons „Trotzdem löschen (Termine behalten)" und „Nur deaktivieren".
-- Beim Bestätigen: Kalender von der Landing lösen und inaktiv setzen, danach Landing löschen — in einem Schritt serverseitig, weiterhin über die Admin-Rechte des angemeldeten Nutzers (RLS unverändert, keine Service-Role).
-- Datenbankfehler, die trotzdem auftreten, werden in Klartext übersetzt statt als roher Constraint-Text angezeigt.
+**Landing Page (Landing-Generator):**
+- Vorabprüfung zählt Kalender und gebuchte Termine der Landing.
+- Löschdialog statt sofortigem Löschen: zeigt die Zahlen und die Folgen in Klartext, mit drei Optionen: „Löschen (Termine behalten)", „Nur deaktivieren", „Abbrechen".
+- Beim Löschen serverseitig in einem Schritt: Kalender von der Landing lösen und inaktiv setzen, Fast-Track-Verknüpfungen lösen, danach Landing löschen.
+
+**Mandant (Mandantenverwaltung):**
+- Bestehende Prüfung bleibt, wird aber nicht mehr zur Sackgasse: die Meldung wird ein Dialog mit „Deaktivieren" (Standardempfehlung) und „Trotzdem löschen".
+- „Trotzdem löschen" verlangt zur Sicherheit die Eingabe des Mandantennamens und löst dann zuerst alle Verknüpfungen (tenant_id leeren) auf Bewerbungen, Profilen, Verträgen, Vertragsvorlagen, Dokumenten und Landings, bevor der Mandant gelöscht wird.
+- Bleibt trotzdem ein Datenbankfehler übrig, wird er in Klartext übersetzt statt als roher Constraint-Text angezeigt.
+
+Beides läuft weiterhin mit den Rechten des angemeldeten Admins (RLS/Mandantentrennung unverändert, keine Service-Role).
 
 ## Teil 2 — Mandant im CSV-Export
 
-Zusätzliche Spalte **„Mandant"** in beiden Exporten, eingefügt als letzte Spalte:
+Zusätzliche letzte Spalte **„Mandant"**:
 `Vorname; Nachname; E-Mail; Telefon; Straße; PLZ; Ort; Land; Mandant`
 
-- **Bewerber:** Mandantenname aus der bereits geladenen `tenant_id` der Bewerbung (Namensliste ist auf der Seite schon vorhanden).
-- **Mitarbeiter:** Mandantenname aus `tenant_id` des Profils, Rückfall auf die verknüpfte Bewerbung. Dafür wird die Mandanten-Namensliste auf der Mitarbeiterseite ebenfalls geladen (gleiche Abfrage wie bei den Bewerbern).
+- **Bewerber:** Mandantenname über die bereits geladene `tenant_id` der Bewerbung (Namensliste ist auf der Seite vorhanden).
+- **Mitarbeiter:** Mandantenname über `tenant_id` des Profils, Rückfall auf die verknüpfte Bewerbung; die Mandanten-Namensliste wird auf der Mitarbeiterseite mit derselben Abfrage geladen.
 - Ohne Zuordnung bleibt das Feld leer.
 - Format (UTF-8 mit BOM, Semikolon, Escaping) und Dateinamen bleiben unverändert.
 
 ## Technische Details
 
-- `src/lib/csv-export.ts`: `CONTACT_HEADERS` um „Mandant" erweitern, `ContactRow` um `tenant`.
-- `src/routes/admin.bewerbungen.tsx`: im Export-Mapping `tenant` aus der vorhandenen Tenant-Map setzen.
-- `src/routes/admin.mitarbeiter.tsx`: Tenants laden (`tenants: id, name`), Row-Mapping um `tenantId` (Profil → Bewerbung) erweitern, Export-Mapping um `tenant`.
-- `src/lib/landing-pages.functions.ts`: neue Prüf-Funktion (Kalender/Termine zählen) und `deleteLandingPage` um „Kalender lösen, dann löschen" erweitern.
-- Landing-Generator-UI (`admin.tsx`-Bereich mit der Landings-Tabelle): Bestätigungsdialog mit den beiden Optionen.
+- `src/lib/csv-export.ts`: `CONTACT_HEADERS` um „Mandant", `ContactRow` um `tenant`.
+- `src/routes/admin.bewerbungen.tsx`: Export-Mapping um `tenant` aus der vorhandenen Tenant-Map.
+- `src/routes/admin.mitarbeiter.tsx`: `tenants (id, name)` laden, Row-Mapping um `tenantId` (Profil → Bewerbung), Export-Mapping um `tenant`.
+- `src/lib/landing-pages.functions.ts`: neue Prüf-Funktion (Kalender/Termine zählen); `deleteLandingPage` löst Kalender und Verknüpfungen vor dem Löschen.
+- Landing-Generator-UI: Bestätigungsdialog mit den drei Optionen.
+- `src/routes/admin.tenants.tsx`: `deleteTenant` wird Dialog mit Deaktivieren/Force-Delete inkl. Namenseingabe und Entkopplungsschritt.
 - Abschluss: Build und Typecheck.
