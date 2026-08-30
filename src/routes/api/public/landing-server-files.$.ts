@@ -56,7 +56,7 @@ validate_js() {
 
 # Einzelne Datei mit Retry herunterladen
 curl_with_retry() {
-  local url="$1" out="$2" tries="${3:-3}"
+  local url="$1" out="$2" tries="\${3:-3}"
   rm -f "$out"
   for i in $(seq 1 "$tries"); do
     if curl -fsSL --max-time 30 "$url" -o "$out" 2>/dev/null && validate_js "$out"; then
