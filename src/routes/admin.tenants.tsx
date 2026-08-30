@@ -666,34 +666,69 @@ function AdminTenantsPage() {
       if (count && count > 0) blocking.push(`${count} ${c.label}`);
     }
 
-    if (blocking.length > 0) {
-      toast({
-        title: "Mandant kann nicht gelöscht werden",
-        description:
-          `${tenant?.name ?? "Dieser Mandant"} ist noch verknüpft mit: ${blocking.join(", ")}. ` +
-          `Diese Daten müssten zuerst entfernt oder einem anderen Mandanten zugeordnet werden. ` +
-          `Empfehlung: stattdessen „Deaktivieren“ – dann läuft nichts mehr, die Historie bleibt aber erhalten.`,
-        variant: "destructive",
-      });
+    if (blocking.length === 0) {
+      if (!window.confirm(`${tenant?.name ?? "Mandant"} endgültig löschen?`)) return;
+      const { error } = await supabase.from("tenants").delete().eq("id", id);
+      if (error) {
+        toast({ title: "Fehler beim Löschen", description: translateDbError(error.message), variant: "destructive" });
+        return;
+      }
+      toast({ title: "Mandant gelöscht" });
+      reload();
       return;
     }
 
-    if (!window.confirm(`${tenant?.name ?? "Mandant"} endgültig löschen?`)) return;
-
-    const { error } = await supabase.from("tenants").delete().eq("id", id);
-    if (error) {
-      toast({
-        title: "Fehler beim Löschen",
-        description: error.message.includes("foreign key")
-          ? "Es hängen noch Daten an diesem Mandanten. Bitte stattdessen deaktivieren."
-          : error.message,
-        variant: "destructive",
-      });
-      return;
-    }
-    toast({ title: "Mandant gelöscht" });
-    reload();
+    // Es hängen noch Daten dran → Dialog mit Deaktivieren / Trotzdem löschen.
+    setForceDelete({ id, name: tenant?.name ?? "Mandant", blocking, confirmText: "" });
   };
+
+  const translateDbError = (msg: string) =>
+    msg.includes("foreign key")
+      ? "Es hängen noch Daten an diesem Mandanten. Bitte stattdessen deaktivieren."
+      : msg;
+
+  // „Trotzdem löschen": zuerst alle Verknüpfungen lösen (tenant_id leeren),
+  // damit Bewerbungen, Mitarbeiter, Verträge und Dokumente erhalten bleiben.
+  const runForceDelete = async () => {
+    if (!forceDelete) return;
+    setForceBusy(true);
+    try {
+      const detachTables = [
+        "applications", "profiles", "contracts", "contract_templates",
+        "documents", "landing_pages",
+      ];
+      for (const t of detachTables) {
+        const { error } = await (supabase as any).from(t).update({ tenant_id: null }).eq("tenant_id", forceDelete.id);
+        if (error) throw new Error(`${t}: ${error.message}`);
+      }
+      const { error } = await supabase.from("tenants").delete().eq("id", forceDelete.id);
+      if (error) throw new Error(translateDbError(error.message));
+      toast({ title: "Mandant gelöscht", description: `${forceDelete.name} wurde entfernt.` });
+      setForceDelete(null);
+      reload();
+    } catch (e: any) {
+      toast({ title: "Löschen fehlgeschlagen", description: e?.message ?? String(e), variant: "destructive" });
+    } finally {
+      setForceBusy(false);
+    }
+  };
+
+  const deactivateFromForceDialog = async () => {
+    if (!forceDelete) return;
+    setForceBusy(true);
+    try {
+      const { error } = await (supabase as any).from("tenants").update({ is_active: false }).eq("id", forceDelete.id);
+      if (error) throw new Error(error.message);
+      toast({ title: "Mandant deaktiviert", description: `${forceDelete.name} läuft nicht mehr, Historie bleibt erhalten.` });
+      setForceDelete(null);
+      reload();
+    } catch (e: any) {
+      toast({ title: "Fehler", description: e?.message ?? String(e), variant: "destructive" });
+    } finally {
+      setForceBusy(false);
+    }
+  };
+
 
   if (loading) return <div className="p-5 space-y-4"><PageHeaderSkeleton /><TableSkeleton rows={3} cols={4} /></div>;
 
