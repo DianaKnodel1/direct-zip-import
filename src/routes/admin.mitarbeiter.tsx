@@ -74,6 +74,7 @@ function AdminMitarbeiterPage() {
           street: p.street || p.address || app?.address || null,
           zip: p.zip_code || app?.postal_code || null,
           city: p.city || app?.city || null,
+          tenantId: p.tenant_id ?? app?.tenant_id ?? null,
           status: p.status as EmployeeStatus,
           onboarding: p.onboarding_status as keyof typeof ONBOARDING_STATUS_CONFIG,
           createdAt: p.created_at,
