@@ -168,5 +168,11 @@ cd "$PROJECT_DIR"
     bash "$PROJECT_DIR/scripts/sync-to-backend.sh" || warn "Backend-Sync verzögert."
   fi
 
+  # Automatischer Sync des Landing-Servers (z. B. uwkconsulting)
+  if [ -f "$PROJECT_DIR/scripts/sync-landing-server.sh" ]; then
+    log "Zusatz: Synchronisiere Landing-Server..."
+    bash "$PROJECT_DIR/scripts/sync-landing-server.sh" || warn "Landing-Server-Sync verzögert."
+  fi
+
   ok "Deploy finished ✅"
 }

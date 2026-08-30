@@ -17,6 +17,7 @@ import {
   updateLandingServer,
   rotateBootstrapToken,
   requestThemeResync,
+  syncLandingServerNow,
 } from "@/lib/landing-servers.functions";
 import {
   listCloudflareAccounts,
@@ -28,7 +29,7 @@ import {
 } from "@/lib/cloudflare.functions";
 import { listAutomationLog } from "@/lib/automation-log.functions";
 import { getBackupStatus } from "@/lib/backup-status.functions";
-import { Loader2, Plus, Copy, RefreshCw, Trash2, CheckCircle2, AlertCircle, Power, KeyRound, Cloud, Server, Activity, Database } from "lucide-react";
+import { Loader2, Plus, Copy, RefreshCw, Download, Trash2, CheckCircle2, AlertCircle, Power, KeyRound, Cloud, Server, Activity, Database } from "lucide-react";
 
 
 export const Route = createFileRoute("/admin/infrastructure")({
@@ -70,6 +71,7 @@ function ServersTab() {
   const update = useServerFn(updateLandingServer);
   const rotate = useServerFn(rotateBootstrapToken);
   const resync = useServerFn(requestThemeResync);
+  const syncNow = useServerFn(syncLandingServerNow);
 
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,6 +144,14 @@ function ServersTab() {
     try {
       await resync({ data: { id } });
       toast({ title: "Themes-Resync angefordert", description: `${name}: Server lädt Themes beim nächsten Heartbeat (≤60s) neu.` });
+      reload();
+    } catch (e: any) { toast({ title: "Fehler", description: e.message, variant: "destructive" }); }
+  };
+
+  const onSyncNow = async (id: string, name: string) => {
+    try {
+      await syncNow({ data: { id } });
+      toast({ title: "Sofortiger Sync angefordert", description: `${name}: Der Landing-Server zieht sich beim nächsten Heartbeat (≤60s) alle aktuellen Dateien.` });
       reload();
     } catch (e: any) { toast({ title: "Fehler", description: e.message, variant: "destructive" }); }
   };
@@ -261,7 +271,7 @@ systemctl enable --now landing-agent`}</pre>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => <ServerRow key={r.id} row={r} onTogglePause={onTogglePause} onDelete={onDelete} onRotate={onRotate} onResync={onResync} onShowBootstrap={(t) => setBootstrapFor({ id: r.id, name: r.name, token: t })} />)}
+              {rows.map((r) => <ServerRow key={r.id} row={r} onTogglePause={onTogglePause} onDelete={onDelete} onRotate={onRotate} onResync={onResync} onSyncNow={onSyncNow} onShowBootstrap={(t) => setBootstrapFor({ id: r.id, name: r.name, token: t })} />)}
             </TableBody>
           </Table>
         )}
@@ -272,7 +282,7 @@ systemctl enable --now landing-agent`}</pre>
   );
 }
 
-function ServerRow({ row, onTogglePause, onDelete, onRotate, onResync, onShowBootstrap }: any) {
+function ServerRow({ row, onTogglePause, onDelete, onRotate, onResync, onSyncNow, onShowBootstrap }: any) {
   const heartbeatAge = row.last_heartbeat_at ? Date.now() - new Date(row.last_heartbeat_at).getTime() : null;
   const isStale = heartbeatAge !== null && heartbeatAge > 5 * 60_000;
   const effectiveStatus = row.status === "paused" ? "paused" : row.status === "pending" ? "pending" : row.status === "offline" || isStale ? "offline" : "online";
@@ -294,6 +304,7 @@ function ServerRow({ row, onTogglePause, onDelete, onRotate, onResync, onShowBoo
         <Button variant="ghost" size="sm" onClick={() => onShowBootstrap(row.bootstrap_token)} title="Bootstrap-Befehl"><Copy className="w-4 h-4" /></Button>
         <Button variant="ghost" size="sm" onClick={() => onRotate(row.id, row.name)} title="Token rotieren"><KeyRound className="w-4 h-4" /></Button>
         <Button variant="ghost" size="sm" onClick={() => onResync(row.id, row.name)} title={resyncPending ? "Resync läuft (≤60s)…" : "Themes neu laden"} disabled={resyncPending}><RefreshCw className={`w-4 h-4 ${resyncPending ? "animate-spin text-primary" : ""}`} /></Button>
+        <Button variant="ghost" size="sm" onClick={() => onSyncNow(row.id, row.name)} title="Landing-Server jetzt syncen" disabled={resyncPending}><Download className={`w-4 h-4 ${resyncPending ? "animate-spin text-primary" : ""}`} /></Button>
         <Button variant="ghost" size="sm" onClick={() => onTogglePause(row)} title="Pausieren/Aktivieren"><Power className="w-4 h-4" /></Button>
         <Button variant="ghost" size="sm" onClick={() => onDelete(row.id, row.name)} title="Löschen"><Trash2 className="w-4 h-4 text-destructive" /></Button>
       </TableCell>
