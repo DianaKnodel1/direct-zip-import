@@ -35,7 +35,7 @@ export function downloadCsv(filename: string, csv: string) {
 
 /** Kontaktdaten-Export: feste Spalten, keine Status- oder Auftragsdaten. */
 export const CONTACT_HEADERS = [
-  "Vorname", "Nachname", "E-Mail", "Telefon", "Straße", "PLZ", "Ort", "Land",
+  "Vorname", "Nachname", "E-Mail", "Telefon", "Straße", "PLZ", "Ort", "Land", "Mandant",
 ];
 
 export type ContactRow = {
@@ -47,6 +47,7 @@ export type ContactRow = {
   zip?: string | null;
   city?: string | null;
   country?: string | null;
+  tenant?: string | null;
 };
 
 const clean = (v: unknown) => {
@@ -59,10 +60,11 @@ export function contactRowsToCsv(rows: ContactRow[]): string {
     CONTACT_HEADERS,
     rows.map(r => [
       clean(r.firstName), clean(r.lastName), clean(r.email), clean(r.phone),
-      clean(r.street), clean(r.zip), clean(r.city), clean(r.country),
+      clean(r.street), clean(r.zip), clean(r.city), clean(r.country), clean(r.tenant),
     ]),
   );
 }
+
 
 /** Zerlegt einen vollständigen Namen in Vor- und Nachname. */
 export function splitName(full: string | null | undefined): { firstName: string; lastName: string } {

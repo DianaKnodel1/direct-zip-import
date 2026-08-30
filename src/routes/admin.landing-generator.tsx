@@ -4,10 +4,15 @@ import { useServerFn } from "@tanstack/react-start";
 import { generateLandingZip } from "@/lib/landing-generator.functions";
 
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   listLandingPages,
   getLandingPage,
   saveLandingPage,
   deleteLandingPage,
+  checkLandingPageDeletable,
   toggleLandingPublished,
 } from "@/lib/landing-pages.functions";
 import { listPartnerCompanies } from "@/lib/partner-companies.functions";
@@ -252,6 +257,11 @@ function LandingGeneratorPage() {
   const listFn = useServerFn(listLandingPages);
   const getFn = useServerFn(getLandingPage);
   const delFn = useServerFn(deleteLandingPage);
+  const checkDelFn = useServerFn(checkLandingPageDeletable);
+  const [deleteTarget, setDeleteTarget] = useState<
+    { id: string; domain: string; schedules: number; appointments: number } | null
+  >(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const toggleFn = useServerFn(toggleLandingPublished);
   const setPortalThemeFn = useServerFn(setTenantPortalTheme);
 
@@ -825,16 +835,49 @@ document.addEventListener('submit', function(e){
   };
 
   const handleDelete = async (id: string, domain: string) => {
-    if (!confirm(`Landing "${domain}" wirklich löschen?`)) return;
     try {
-      await delFn({ data: { id } } as any);
-      if (editingId === id) handleNewLanding();
-      toast({ title: "Gelöscht", description: domain });
+      const res: any = await checkDelFn({ data: { id } } as any);
+      setDeleteTarget({
+        id, domain,
+        schedules: res?.schedules ?? 0,
+        appointments: res?.appointments ?? 0,
+      });
+    } catch (e: any) {
+      toast({ title: "Prüfung fehlgeschlagen", description: e?.message ?? String(e), variant: "destructive" });
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    try {
+      await delFn({ data: { id: deleteTarget.id } } as any);
+      if (editingId === deleteTarget.id) handleNewLanding();
+      toast({ title: "Gelöscht", description: deleteTarget.domain });
+      setDeleteTarget(null);
       reloadLandings();
     } catch (e: any) {
       toast({ title: "Löschen fehlgeschlagen", description: e?.message ?? String(e), variant: "destructive" });
+    } finally {
+      setDeleteBusy(false);
     }
   };
+
+  const deactivateFromDialog = async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    try {
+      await toggleFn({ data: { id: deleteTarget.id, is_published: false } } as any);
+      toast({ title: "Deaktiviert", description: `${deleteTarget.domain} ist offline.` });
+      setDeleteTarget(null);
+      reloadLandings();
+    } catch (e: any) {
+      toast({ title: "Fehler", description: e?.message ?? String(e), variant: "destructive" });
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
 
   const handleTogglePublished = async (id: string, next: boolean) => {
     try {
@@ -1723,8 +1766,48 @@ document.addEventListener('submit', function(e){
           </div>
         </div>
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Landing „{deleteTarget?.domain}" löschen?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                {deleteTarget && deleteTarget.appointments > 0 ? (
+                  <p>
+                    Diese Landing hat einen Buchungskalender mit <strong>{deleteTarget.appointments} gebuchten Terminen</strong>.
+                    Die Termine <strong>bleiben erhalten</strong> und weiterhin unter „Mitarbeiter-Termine" sichtbar –
+                    der Kalender wird nur von der Landing gelöst und deaktiviert.
+                  </p>
+                ) : (
+                  <p>Es hängen keine gebuchten Termine an dieser Landing.</p>
+                )}
+                <p>
+                  Nach dem Löschen ist die Domain nicht mehr erreichbar (404). Bewerbungen bleiben erhalten,
+                  verlieren aber den Herkunfts-Verweis. Theme, Slots und Branding dieser Landing sind
+                  <strong> nicht wiederherstellbar</strong>. Der DNS-Eintrag bleibt bestehen.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteBusy}>Abbrechen</AlertDialogCancel>
+            <Button variant="outline" disabled={deleteBusy} onClick={deactivateFromDialog}>
+              Nur deaktivieren
+            </Button>
+            <AlertDialogAction
+              disabled={deleteBusy}
+              onClick={(e) => { e.preventDefault(); confirmDelete(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteBusy ? "Lösche…" : "Löschen (Termine behalten)"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
+
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

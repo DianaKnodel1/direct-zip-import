@@ -566,6 +566,10 @@ function AdminTenantsPage() {
   const [editTenant, setEditTenant] = useState<Tenant | undefined>();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [switchTenant, setSwitchTenant] = useState<Tenant | undefined>();
+  const [forceDelete, setForceDelete] = useState<
+    { id: string; name: string; blocking: string[]; confirmText: string } | null
+  >(null);
+  const [forceBusy, setForceBusy] = useState(false);
   const { toast } = useToast();
   const setDnsFn = useServerFn(setLandingDnsRecord);
   const { data: readiness, loading: readinessLoading, reload: reloadReadiness } = useTenantReadiness();
@@ -666,34 +670,69 @@ function AdminTenantsPage() {
       if (count && count > 0) blocking.push(`${count} ${c.label}`);
     }
 
-    if (blocking.length > 0) {
-      toast({
-        title: "Mandant kann nicht gelöscht werden",
-        description:
-          `${tenant?.name ?? "Dieser Mandant"} ist noch verknüpft mit: ${blocking.join(", ")}. ` +
-          `Diese Daten müssten zuerst entfernt oder einem anderen Mandanten zugeordnet werden. ` +
-          `Empfehlung: stattdessen „Deaktivieren“ – dann läuft nichts mehr, die Historie bleibt aber erhalten.`,
-        variant: "destructive",
-      });
+    if (blocking.length === 0) {
+      if (!window.confirm(`${tenant?.name ?? "Mandant"} endgültig löschen?`)) return;
+      const { error } = await supabase.from("tenants").delete().eq("id", id);
+      if (error) {
+        toast({ title: "Fehler beim Löschen", description: translateDbError(error.message), variant: "destructive" });
+        return;
+      }
+      toast({ title: "Mandant gelöscht" });
+      reload();
       return;
     }
 
-    if (!window.confirm(`${tenant?.name ?? "Mandant"} endgültig löschen?`)) return;
-
-    const { error } = await supabase.from("tenants").delete().eq("id", id);
-    if (error) {
-      toast({
-        title: "Fehler beim Löschen",
-        description: error.message.includes("foreign key")
-          ? "Es hängen noch Daten an diesem Mandanten. Bitte stattdessen deaktivieren."
-          : error.message,
-        variant: "destructive",
-      });
-      return;
-    }
-    toast({ title: "Mandant gelöscht" });
-    reload();
+    // Es hängen noch Daten dran → Dialog mit Deaktivieren / Trotzdem löschen.
+    setForceDelete({ id, name: tenant?.name ?? "Mandant", blocking, confirmText: "" });
   };
+
+  const translateDbError = (msg: string) =>
+    msg.includes("foreign key")
+      ? "Es hängen noch Daten an diesem Mandanten. Bitte stattdessen deaktivieren."
+      : msg;
+
+  // „Trotzdem löschen": zuerst alle Verknüpfungen lösen (tenant_id leeren),
+  // damit Bewerbungen, Mitarbeiter, Verträge und Dokumente erhalten bleiben.
+  const runForceDelete = async () => {
+    if (!forceDelete) return;
+    setForceBusy(true);
+    try {
+      const detachTables = [
+        "applications", "profiles", "contracts", "contract_templates",
+        "documents", "landing_pages",
+      ];
+      for (const t of detachTables) {
+        const { error } = await (supabase as any).from(t).update({ tenant_id: null }).eq("tenant_id", forceDelete.id);
+        if (error) throw new Error(`${t}: ${error.message}`);
+      }
+      const { error } = await supabase.from("tenants").delete().eq("id", forceDelete.id);
+      if (error) throw new Error(translateDbError(error.message));
+      toast({ title: "Mandant gelöscht", description: `${forceDelete.name} wurde entfernt.` });
+      setForceDelete(null);
+      reload();
+    } catch (e: any) {
+      toast({ title: "Löschen fehlgeschlagen", description: e?.message ?? String(e), variant: "destructive" });
+    } finally {
+      setForceBusy(false);
+    }
+  };
+
+  const deactivateFromForceDialog = async () => {
+    if (!forceDelete) return;
+    setForceBusy(true);
+    try {
+      const { error } = await (supabase as any).from("tenants").update({ is_active: false }).eq("id", forceDelete.id);
+      if (error) throw new Error(error.message);
+      toast({ title: "Mandant deaktiviert", description: `${forceDelete.name} läuft nicht mehr, Historie bleibt erhalten.` });
+      setForceDelete(null);
+      reload();
+    } catch (e: any) {
+      toast({ title: "Fehler", description: e?.message ?? String(e), variant: "destructive" });
+    } finally {
+      setForceBusy(false);
+    }
+  };
+
 
   if (loading) return <div className="p-5 space-y-4"><PageHeaderSkeleton /><TableSkeleton rows={3} cols={4} /></div>;
 
@@ -807,7 +846,52 @@ function AdminTenantsPage() {
         onOpenChange={(v) => { if (!v) setReadinessTenantId(null); }}
         onRefresh={reloadReadiness}
       />
+
+      <Dialog open={!!forceDelete} onOpenChange={(o) => { if (!o && !forceBusy) setForceDelete(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-4 w-4" /> Mandant „{forceDelete?.name}" löschen
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>Mit diesem Mandanten sind noch verknüpft:</p>
+            <ul className="list-disc pl-5 text-muted-foreground">
+              {forceDelete?.blocking.map((b) => <li key={b}>{b}</li>)}
+            </ul>
+            <p className="rounded border border-border bg-muted/40 p-2 text-xs">
+              <strong>Empfehlung: Deaktivieren.</strong> Der Mandant ist dann offline, alle Daten und die
+              Historie bleiben zugeordnet und wiederherstellbar.
+            </p>
+            <p className="rounded border border-destructive/40 bg-destructive/5 p-2 text-xs">
+              <strong>Trotzdem löschen:</strong> Die oben genannten Datensätze werden <em>nicht</em> gelöscht,
+              verlieren aber dauerhaft die Mandantenzuordnung (sie erscheinen danach ohne Mandant).
+              Das lässt sich nicht rückgängig machen.
+            </p>
+            <div className="space-y-1">
+              <Label className="text-xs">Zum Bestätigen Mandantennamen eingeben</Label>
+              <Input
+                value={forceDelete?.confirmText ?? ""}
+                placeholder={forceDelete?.name}
+                onChange={(e) => setForceDelete((p) => p && { ...p, confirmText: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
+            <Button variant="ghost" disabled={forceBusy} onClick={() => setForceDelete(null)}>Abbrechen</Button>
+            <Button variant="outline" disabled={forceBusy} onClick={deactivateFromForceDialog}>Deaktivieren</Button>
+            <Button
+              variant="destructive"
+              disabled={forceBusy || forceDelete?.confirmText.trim() !== forceDelete?.name}
+              onClick={runForceDelete}
+            >
+              {forceBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Trotzdem löschen"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
 

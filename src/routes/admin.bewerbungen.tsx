@@ -383,6 +383,7 @@ function AdminBewerbungenPage() {
       toast.error("Keine Datensätze zum Exportieren vorhanden.");
       return;
     }
+    const tenantNameById = new Map(tenants.map(t => [t.id, t.name]));
     const csv = contactRowsToCsv(rowsToExport.map(r => {
       const split = splitName(r.name);
       return {
@@ -394,6 +395,7 @@ function AdminBewerbungenPage() {
         zip: r.zip,
         city: r.city,
         country: "",
+        tenant: (r.tenantId && tenantNameById.get(r.tenantId)) || "",
       };
     }));
     downloadCsv(`bewerber-${slugifyLabel(label)}-${dateStamp()}.csv`, csv);

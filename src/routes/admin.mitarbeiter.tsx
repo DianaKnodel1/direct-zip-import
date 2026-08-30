@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useNavigate } from "@/lib/router-compat";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAdminData } from "@/contexts/AdminDataContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -43,6 +43,14 @@ function AdminMitarbeiterPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
   const runBulkDelete = useServerFn(bulkDeleteEmployees);
+  // Nur für den CSV-Export: Mandantenname zur tenant_id.
+  const [tenants, setTenants] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    supabase.from("tenants").select("id, name").order("name").then(({ data }) => {
+      setTenants((data ?? []) as Array<{ id: string; name: string }>);
+    });
+  }, []);
+
 
   const rows = useMemo(() => {
     const appById = new Map((applications as any[]).map((a) => [a.id, a]));
@@ -66,6 +74,7 @@ function AdminMitarbeiterPage() {
           street: p.street || p.address || app?.address || null,
           zip: p.zip_code || app?.postal_code || null,
           city: p.city || app?.city || null,
+          tenantId: p.tenant_id ?? app?.tenant_id ?? null,
           status: p.status as EmployeeStatus,
           onboarding: p.onboarding_status as keyof typeof ONBOARDING_STATUS_CONFIG,
           createdAt: p.created_at,
@@ -127,6 +136,7 @@ function AdminMitarbeiterPage() {
       toast.error("Keine Datensätze zum Exportieren vorhanden.");
       return;
     }
+    const tenantNameById = new Map(tenants.map(t => [t.id, t.name]));
     const csv = contactRowsToCsv(filtered.map(r => {
       const split = splitName(r.name);
       return {
@@ -138,6 +148,7 @@ function AdminMitarbeiterPage() {
         zip: r.zip,
         city: r.city,
         country: "",
+        tenant: (r.tenantId && tenantNameById.get(r.tenantId)) || "",
       };
     }));
     downloadCsv(`mitarbeiter-${dateStamp()}.csv`, csv);
