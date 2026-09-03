@@ -32,15 +32,16 @@ export const getLastSignIns = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => Schema.parse(input))
   .handler(async ({ data, context }): Promise<UserActivityResult> => {
-    // Admin-Gate: nur Admins dürfen Login-Zeitstempel fremder User abfragen.
-    const { data: roleRow, error: roleErr } = await (context.supabase as any)
+    // Admin-Gate: Admins UND Admin-Mitarbeiter dürfen Aktivitätsdaten sehen
+    // (identisch zur Behandlung im Admin-Chat).
+    const { data: roleRows, error: roleErr } = await (context.supabase as any)
       .from("user_roles")
       .select("role")
       .eq("user_id", context.userId)
-      .eq("role", "admin")
-      .maybeSingle();
+      .in("role", ["admin", "admin_mitarbeiter"]);
     if (roleErr) throw new Error(roleErr.message);
-    if (!roleRow) throw new Error("Nicht autorisiert");
+    if (!roleRows || roleRows.length === 0) throw new Error("Nicht autorisiert");
+
 
     const sb = context.supabase as any;
 
