@@ -277,18 +277,29 @@ async function handle(req: Request): Promise<Response> {
     if (v) outHeaders.set(h, h === "referer" ? v.replace(hostHeader, targetHost) : v);
   }
 
+  const hasReqBody = !(method === "GET" || method === "HEAD");
+  let reqBody: ArrayBuffer | undefined;
+  if (hasReqBody) {
+    try {
+      reqBody = await req.arrayBuffer();
+    } catch {
+      reqBody = undefined;
+    }
+  }
+
   let upstream: Response;
   try {
     upstream = await fetch(targetUrl, {
       method,
       headers: outHeaders,
-      body: method === "GET" || method === "HEAD" ? undefined : req.body,
+      body: reqBody && reqBody.byteLength > 0 ? reqBody : undefined,
       redirect: "manual",
     });
   } catch (err) {
     console.warn(`[webid-sim] upstream fail ${targetUrl}: ${(err as Error).message}`);
     return new Response("Upstream unavailable.", { status: 502 });
   }
+
 
   console.log(`[webid-sim] ${method} ${url.pathname}${url.search} -> ${targetUrl} -> ${upstream.status}`);
   if (upstream.status >= 400) {
