@@ -16,7 +16,7 @@ import { useChatNotifications } from "@/hooks/use-chat-notifications";
 import { Send, Bot, UserCheck, Search, MessageCircle, Building2, EyeOff, Archive, ChevronRight, MailOpen, StickyNote, AlertCircle, Lock, Pencil, Trash2, Check, X, Mail, Sparkles, Loader2, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getLastSignIns } from "@/lib/last-sign-ins.functions";
-import { replaceMessages, latestTimestamp, type ChatConnectionState } from "@/lib/chat-sync";
+import { replaceMessages, type ChatConnectionState } from "@/lib/chat-sync";
 import { fetchAll } from "@/lib/fetch-all";
 import { useOnlineUsers } from "@/hooks/use-presence";
 import { useSearchParams } from "@/lib/router-compat";
@@ -165,6 +165,29 @@ function AdminChatPage() {
   useEffect(() => { selectedUserIdRef.current = selectedUserId; }, [selectedUserId]);
   useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
 
+  // "Zuletzt aktiv" aktuell halten: Werte alle 60s neu laden (nur bei
+  // sichtbarem Tab) sowie sofort bei Fokus/Sichtbarwechsel. Zusätzlich ein
+  // Tick, damit die relative Textanzeige ("Aktiv vor X Min") mitläuft.
+  const [, setActivityTick] = useState(0);
+  useEffect(() => {
+    if (!user) return;
+    if (typeof window === "undefined") return;
+    const run = () => {
+      setActivityTick((t) => t + 1);
+      if (document.visibilityState === "visible") void refreshActivity();
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") run(); };
+    const iv = window.setInterval(run, 60_000);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      window.clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [user]);
+
+
   const loadConversations = async () => {
     // Wichtig: profiles/chat_conversations seitenweise laden. Ohne Pagination
     // liefert die Data-API nur 1000 Zeilen – ab dem 1001. Mitarbeiter wären
@@ -283,25 +306,34 @@ function AdminChatPage() {
     setConversations(list);
     setLoading(false);
 
-    if (list.length > 0) {
-      try {
-        const res = await getLastSignIns({ data: { user_ids: list.map((c) => c.user_id) } });
-        const map = res.activity ?? {};
-        const problems = [res.signInError, res.seenError].filter(Boolean) as string[];
-        // Anzeige nutzt primär den Heartbeat (last_seen_at), Fallback ist der
-        // letzte Login – kritisch ist es nur, wenn BEIDE Quellen ausfallen.
-        setActivityError(res.signInError && res.seenError ? res.seenError : null);
-        if (problems.length > 0) console.warn("Aktivitäts-Quellen teilweise nicht verfügbar:", problems);
-        setConversations((prev) => prev.map((c) => ({
-          ...c,
-          lastSignInAt: map[c.user_id]?.last_sign_in_at ?? null,
-          lastSeenAt: map[c.user_id]?.last_seen_at ?? null,
-        })));
-      } catch (e: any) {
-        const msg = e?.message || String(e);
-        setActivityError(msg);
-        console.warn("Last sign-ins konnten nicht geladen werden:", e);
-      }
+    if (list.length > 0) await refreshActivity(list.map((c) => c.user_id));
+  };
+
+  /**
+   * Lädt die Aktivitätsdaten (Heartbeat + letzter Login) nach.
+   * Wird beim Laden der Liste UND regelmäßig aufgerufen, damit
+   * "Zuletzt aktiv" in einem lange geöffneten Postfach nicht einfriert.
+   */
+  const refreshActivity = async (userIds?: string[]) => {
+    const ids = userIds ?? conversationsRef.current.map((c) => c.user_id);
+    if (ids.length === 0) return;
+    try {
+      const res = await getLastSignIns({ data: { user_ids: ids } });
+      const map = res.activity ?? {};
+      const problems = [res.signInError, res.seenError].filter(Boolean) as string[];
+      // Die Anzeige "Zuletzt aktiv" basiert ausschließlich auf dem Heartbeat
+      // (last_seen_at). Fällt diese Quelle aus, ist die Anzeige nicht belastbar.
+      setActivityError(res.seenError ?? null);
+      if (problems.length > 0) console.warn("Aktivitäts-Quellen teilweise nicht verfügbar:", problems);
+      setConversations((prev) => prev.map((c) => ({
+        ...c,
+        lastSignInAt: map[c.user_id]?.last_sign_in_at ?? c.lastSignInAt ?? null,
+        lastSeenAt: map[c.user_id]?.last_seen_at ?? c.lastSeenAt ?? null,
+      })));
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      setActivityError(msg);
+      console.warn("Aktivitätsdaten konnten nicht geladen werden:", e);
     }
   };
 
@@ -318,9 +350,12 @@ function AdminChatPage() {
     return `Aktiv am ${new Date(ts).toLocaleDateString("de-DE")}`;
   };
 
-  /** Jüngste bekannte Aktivität: Portal-Heartbeat, Login ODER letzte Nachricht. */
-  const activityAt = (conv: Conversation) =>
-    latestTimestamp(conv.lastSeenAt, conv.lastSignInAt, conv.lastFromEmployeeAt);
+  /**
+   * "Zuletzt aktiv" = echte Portal-Aktivität (Heartbeat).
+   * Letzter Login und letzte Nachricht sind bewusst KEINE Aktivitätsquellen
+   * mehr – sie stehen nur noch als Zusatzinfo im Tooltip.
+   */
+  const activityAt = (conv: Conversation) => conv.lastSeenAt ?? null;
 
   const activityTooltip = (conv: Conversation) => {
     const fmt = (v?: string | null) => (v ? new Date(v).toLocaleString("de-DE") : "—");
@@ -330,6 +365,7 @@ function AdminChatPage() {
       `Letzte Nachricht: ${fmt(conv.lastFromEmployeeAt)}`,
     ].join("\n");
   };
+
 
 
   const selectConversation = async (userId: string) => {

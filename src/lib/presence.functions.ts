@@ -11,13 +11,24 @@ function isMissingLastSeenColumnError(error: { message?: string } | null | undef
 }
 
 /**
- * Heartbeat: setzt profiles.last_seen_at = now() für den eingeloggten User.
+ * Heartbeat: setzt profiles.last_seen_at für den eingeloggten User.
+ * Bevorzugt die DB-Funktion touch_last_seen() (Zeitstempel serverseitig via
+ * now()), fällt auf ein direktes UPDATE zurück, solange die Migration
+ * `20260903120000_last_active_fixes.sql` noch nicht eingespielt ist.
  * Wird vom Browser alle ~60s aufgerufen, solange ein Tab offen ist.
  */
 export const updateLastSeen = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { error } = await (context.supabase as any)
+    const sb = context.supabase as any;
+
+    const rpc = await sb.rpc("touch_last_seen").then(
+      (r: any) => r,
+      (e: any) => ({ data: null, error: { message: String(e?.message ?? e) } }),
+    );
+    if (!rpc.error) return { ok: true, skipped: false as const };
+
+    const { error } = await sb
       .from("profiles")
       .update({ last_seen_at: new Date().toISOString() })
       .eq("user_id", context.userId);
@@ -32,3 +43,4 @@ export const updateLastSeen = createServerFn({ method: "POST" })
 
     return { ok: true, skipped: false as const };
   });
+
