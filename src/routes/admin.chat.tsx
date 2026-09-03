@@ -16,7 +16,7 @@ import { useChatNotifications } from "@/hooks/use-chat-notifications";
 import { Send, Bot, UserCheck, Search, MessageCircle, Building2, EyeOff, Archive, ChevronRight, MailOpen, StickyNote, AlertCircle, Lock, Pencil, Trash2, Check, X, Mail, Sparkles, Loader2, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getLastSignIns } from "@/lib/last-sign-ins.functions";
-import { replaceMessages, latestTimestamp, type ChatConnectionState } from "@/lib/chat-sync";
+import { replaceMessages, type ChatConnectionState } from "@/lib/chat-sync";
 import { fetchAll } from "@/lib/fetch-all";
 import { useOnlineUsers } from "@/hooks/use-presence";
 import { useSearchParams } from "@/lib/router-compat";
