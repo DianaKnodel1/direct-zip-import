@@ -1,48 +1,66 @@
-# WebID-Sim vereinfachen und Fehler eingrenzen
+# WebID-Fehler ohne HAR finden
 
-Ziel: Ohne Rätselraten sehen, **welcher Request** hängt, **wohin** er geht und **was** die Antwort ist. Danach den kleinsten möglichen Fix.
+## Einfach erklärt
 
-## Was wir vermuten (unbestätigt)
+Die Adresse im Browser ist nur die **erste Seite**:
 
-Der Proxy schreibt HTML/CSS nur für **eine** `target_origin` (z. B. `webid-gateway.de`) um. Das WebID-Widget spricht aber sehr wahrscheinlich zusätzlich mit **anderen Hosts** (`service.webid-solutions.de`, `webid-solutions.de` o. ä.). Requests dorthin gehen entweder direkt an die echte Origin (dann fehlen Cookies/Session) oder werden relativ an unsere Sim-Domain gesendet und laufen bei uns ins Leere. Nichts davon ist verifiziert — deshalb erst messen.
+```text
+Browser → bv-agentur.webid-portal.com → Proxy → WebID-Startseite
+```
 
-Zusätzlich haben wir einen `MutationObserver` im Overlay, der bei DOM-Änderungen `location.reload()` triggert (server.ts Z. 158-163). Das kann die Widget-Initialisierung im Kreis reloaden.
+Dass diese Seite erscheint, beweist nur: **Der erste GET-Aufruf funktioniert.**
 
-## Schritt 1 – Diagnose (kein Code-Change)
+Nach dem Klick auf „Weiter/Überprüfen“ startet das WebID-JavaScript weitere, unsichtbare Anfragen, zum Beispiel:
 
-Zwei simple Messungen, mehr nicht:
+```text
+/api/web-product/...
+/cgate/self-ident-status/...
+oder Anfragen an einen weiteren WebID-Host
+```
 
-1. **HAR-Datei** vom „Überprüfen"-Klick.
-   - DevTools → Network → „Preserve log" an → „Fetch/XHR" Filter → auf „Überprüfen" klicken → Rechtsklick in Liste → **„Save all as HAR with content"** → Datei schicken.
-2. **Server-Log parallel dazu**:
-   ```bash
-   journalctl -u webid-sim -n 500 --no-pager | tail -200
-   ```
+Unser Proxy baut derzeit jeden Pfad gegen genau eine konfigurierte `target_origin`. Wenn `/service/precheck/...` und die späteren API-Pfade tatsächlich zu unterschiedlichen WebID-Hosts gehören, schickt er mindestens einen Aufruf an den falschen Server. Deshalb kann die sichtbare Seite funktionieren, während das Widget bei „Initialisiere…“ stehen bleibt.
 
-Aus der HAR lesen wir ab: Zielhost, Status, Response-Body des ersten Fehlers. Damit steht der Fix fest.
+Wichtig: Der Wechsel von `/service/index/...` zu `/service/precheck/...` ist vermutlich ein normaler Redirect innerhalb des WebID-Ablaufs und nicht automatisch der Fehler.
 
-## Schritt 2 – Vereinfachung des Proxys (nach Diagnose, klein halten)
+## Vereinfachter Diagnoseweg
 
-Nur die drei kleinsten Vereinfachungen, die den Fehler sichtbar machen und typische Ursachen ausschließen:
+Wir verzichten auf HAR und DevTools-Auswertung.
 
-**A. Reload-Schleife entschärfen** (`webid-sim-server/server.ts`, Z. 157-163)
-Statt `location.reload()` bei fehlenden Overlay-Elementen: Elemente einfach neu einfügen. Verhindert, dass unser Watchdog die Widget-Initialisierung tötet.
+### 1. Proxy protokolliert jeden Aufruf verständlich
 
-**B. Server-seitiges Request-Log** hinzufügen (eine Zeile pro Request):
-`[webid-sim] METHOD host path → upstream status`
-Damit sieht `journalctl` sofort, welcher Request wo landet.
+In `webid-sim-server/server.ts` ergänzen wir pro Anfrage eine kompakte Zeile:
 
-**C. Alle „unbekannten" WebID-Hosts explizit ablehnen mit 501 + Log** (statt still 404):
-Wenn das Widget einen fremden Host aufruft und der über unsere Sim-Domain kommt, schreibt der Proxy `[MISSING UPSTREAM] host=… path=…` in den Log. So wird ohne HAR sichtbar, welche zusätzlichen Hosts wir brauchen.
+```text
+[webid-sim] POST /cgate/... → https://webid-gateway.de/cgate/... → 502
+```
 
-Danach entscheiden wir anhand des Logs, ob wir Multi-Upstream-Routing brauchen (neue Spalte `extra_hosts` in `webid_sim_domains` + Rewrite über `/__u/<host>/…`) oder ob eine kleinere Änderung reicht.
+Bei Fehlerantworten protokollieren wir zusätzlich einen kurzen, begrenzten Ausschnitt der Upstream-Antwort. Cookies, Tokens und Formulardaten werden nicht geloggt.
 
-## Was wir bewusst NICHT jetzt machen
+### 2. Mögliche Reload-Schleife entfernen
 
-- Kein Multi-Upstream-Umbau blind.
-- Kein Cookie-/Domain-Rewrite-Overhaul.
-- Keine DB-Migration, bevor der Log zeigt, dass wir sie brauchen.
+Der vorhandene Overlay-Watchdog führt aktuell `location.reload()` aus, sobald WebID eines unserer Overlay-Elemente entfernt. Das kann die Initialisierung selbst unterbrechen. Statt neu zu laden, setzt er nur das fehlende Simulationselement wieder ein.
 
-## Deliverable Schritt 1
+### 3. Danach nur einmal testen
 
-Du schickst mir HAR + Logauszug. Ich sage dir dann konkret: „Es fehlt Host X, wir brauchen Fix Y" — und baue nur den.
+Nach Deployment:
+
+1. Simulationsseite öffnen.
+2. Einmal auf „Weiter/Überprüfen“ klicken und warten, bis „Initialisiere…“ erscheint.
+3. Auf dem Portal-Server ausführen:
+
+```bash
+journalctl -u webid-sim --since "5 minutes ago" --no-pager
+```
+
+Die Ausgabe zeigt dann direkt den fehlerhaften Pfad, Zielserver und Status. Kein HAR und kein Suchen in Browser-Menüs nötig.
+
+## Anschließender Fix
+
+Erst anhand dieses Logs wird der Routing-Fix festgelegt:
+
+- **Falscher Zielhost:** gezieltes Routing pro WebID-Pfad bzw. erlaubtem WebID-Host ergänzen.
+- **OPTIONS/CORS fehlerhaft:** Preflight und CORS-Header vollständig an die Sim-Domain anpassen.
+- **Cookie/Session fehlt:** Cookie-Domain und Weitergabe für den betroffenen Host korrigieren.
+- **Reload im Log/Browser:** Overlay-Watchdog war die Ursache; die Änderung aus Schritt 2 behebt sie.
+
+So ändern wir nicht blind das gesamte Proxy-System, sondern brauchen nach dem Deployment nur noch einen Klick und einen einfachen Log-Befehl.
