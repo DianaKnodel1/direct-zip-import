@@ -148,17 +148,32 @@ function buildOverlay(row: DomainRow): string {
       <button type="button" onclick="var b=document.getElementById('__webid_sim_backdrop');if(b)b.remove();try{sessionStorage.setItem('__webid_sim_ack','1')}catch(e){}">Verstanden – fortfahren</button>
     </div>
   </div>`;
+  const overlayCssJson = JSON.stringify(OVERLAY_CSS);
+  const topbarJson = JSON.stringify(topbarEl);
+  const badgeJson = JSON.stringify(badgeEl);
   const script = `<script>(function(){
     try{document.title='[SIMULATION] '+document.title;}catch(e){}
+    function restoreOverlay(){
+      if(!document.getElementById('__webid_sim_style')){
+        var s=document.createElement('style');s.id='__webid_sim_style';s.textContent=${overlayCssJson};
+        (document.head||document.documentElement).appendChild(s);
+      }
+      if(document.body&&!document.getElementById('__webid_sim_topbar')){
+        document.body.insertAdjacentHTML('beforeend',${topbarJson});
+      }
+      if(document.body&&!document.getElementById('__webid_sim_badge')){
+        document.body.insertAdjacentHTML('beforeend',${badgeJson});
+      }
+    }
     function boot(){
       try{document.body.classList.add('__webid_sim_shifted');}catch(e){}
       var ack=false;try{ack=sessionStorage.getItem('__webid_sim_ack')==='1'}catch(e){}
       if(ack){var b=document.getElementById('__webid_sim_backdrop');if(b)b.remove();}
-      // Watchdog: falls die Seite unsere Elemente entfernt, wieder einsetzen.
+      // Watchdog: fehlende Simulationselemente schonend wieder einsetzen.
+      var restorePending=false;
       var mo=new MutationObserver(function(){
-        ['__webid_sim_topbar','__webid_sim_badge','__webid_sim_style'].forEach(function(id){
-          if(!document.getElementById(id)){location.reload();}
-        });
+        if(restorePending)return;restorePending=true;
+        requestAnimationFrame(function(){restorePending=false;restoreOverlay();});
       });
       mo.observe(document.documentElement,{childList:true,subtree:true});
     }
@@ -197,6 +212,16 @@ function rewriteHtml(html: string, row: DomainRow, targetHost: string): string {
 
 function escapeReg(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function safeLogExcerpt(value: string): string {
+  return value
+    .slice(0, 500)
+    .replace(/Bearer\s+[A-Za-z0-9._~-]+/gi, "Bearer [REDACTED]")
+    .replace(/("(?:access_token|refresh_token|token|authorization|cookie)"\s*:\s*")[^"]+("?)/gi, "$1[REDACTED]$2")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function rewriteCss(css: string, targetHost: string, simHost: string): string {
@@ -263,6 +288,16 @@ async function handle(req: Request): Promise<Response> {
   } catch (err) {
     console.warn(`[webid-sim] upstream fail ${targetUrl}: ${(err as Error).message}`);
     return new Response("Upstream unavailable.", { status: 502 });
+  }
+
+  console.log(`[webid-sim] ${method} ${url.pathname}${url.search} -> ${targetUrl} -> ${upstream.status}`);
+  if (upstream.status >= 400) {
+    try {
+      const excerpt = safeLogExcerpt(await upstream.clone().text());
+      if (excerpt) console.warn(`[webid-sim] upstream error ${upstream.status}: ${excerpt}`);
+    } catch {
+      console.warn(`[webid-sim] upstream error ${upstream.status}: response body unavailable`);
+    }
   }
 
   // Redirects umschreiben
