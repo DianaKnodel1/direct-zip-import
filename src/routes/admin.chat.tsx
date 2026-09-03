@@ -165,6 +165,29 @@ function AdminChatPage() {
   useEffect(() => { selectedUserIdRef.current = selectedUserId; }, [selectedUserId]);
   useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
 
+  // "Zuletzt aktiv" aktuell halten: Werte alle 60s neu laden (nur bei
+  // sichtbarem Tab) sowie sofort bei Fokus/Sichtbarwechsel. Zusätzlich ein
+  // Tick, damit die relative Textanzeige ("Aktiv vor X Min") mitläuft.
+  const [, setActivityTick] = useState(0);
+  useEffect(() => {
+    if (!user) return;
+    if (typeof window === "undefined") return;
+    const run = () => {
+      setActivityTick((t) => t + 1);
+      if (document.visibilityState === "visible") void refreshActivity();
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") run(); };
+    const iv = window.setInterval(run, 60_000);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      window.clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [user]);
+
+
   const loadConversations = async () => {
     // Wichtig: profiles/chat_conversations seitenweise laden. Ohne Pagination
     // liefert die Data-API nur 1000 Zeilen – ab dem 1001. Mitarbeiter wären
