@@ -50,7 +50,7 @@ der einzige kritische Teil — sie wird zuletzt mit einem frischen Dump
 
 1. `bash scripts/setup-server2.sh` auf dem neuen Portal-Server (nginx/systemd).
 2. Repo klonen, `.env` und `.env.server` vom Backup zurückspielen.
-3. Erster Build + `systemctl restart portal`;健康 Check auf `http://localhost:3000`.
+3. Erster Build + `systemctl restart portal`; Health-Check auf `http://localhost:3000`.
 4. SSH-Zugänge der Nachbarserver einrichten: Deploy-Key, `ssh-copy-id` Richtung
    Landing-Server (.234) für den Landing-Sync.
 
