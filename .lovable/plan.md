@@ -4,6 +4,7 @@
 
 | Phase | Dauer | Ausfallzeit? |
 |---|---|---|
+| Backup-Server aufsetzen (einmalig, vorab) | 2–3 h | nein |
 | Neue Server bestellen + OS installieren | 0,5–2 h (je nach Provider) | nein |
 | Backend parallel auf neuem Server aufbauen (Supabase-Stack + Datenbank-Restore) | 2–4 h | nein |
 | Frontend parallel auf neuem Server aufbauen | 0,5–1 h | nein |
@@ -24,14 +25,45 @@ Beide alten Server bleiben laufen, bis die neuen fertig sind. Die Datenbank ist
 der einzige kritische Teil — sie wird zuletzt mit einem frischen Dump
 übernommen, damit nichts verloren geht.
 
-## Phase 1 — Vorbereitung (keine Ausfallzeit)
+## Phase 0 — Backup-Server aufsetzen (zuerst, +2–3 h einmalig)
+
+Vor dem Umzug brauchst du laufende Backups — sie sind gleichzeitig die
+Grundlage für den Umzug selbst. Im Projekt ist dafür bereits alles vorhanden;
+es ist nur noch nicht eingerichtet.
+
+1. Kleinen VPS bestellen (Ubuntu 22.04/24.04, 2 vCPU, 4 GB RAM, Platte
+   mindestens 5× so groß wie die Datenbank). Empfehlung: anderer Anbieter oder
+   anderes Rechenzentrum als Portal/Backend.
+2. Auf dem Backup-Server: `bash scripts/setup-backup-server.sh`
+   (legt Backup-Nutzer, Verzeichnisse `/var/backups/portal/{daily,monthly,logs}` an).
+3. Auf Portal, Backend, Landing, Bot und WebID jeweils den Zugriff erlauben:
+   `ssh-copy-id -i /root/.ssh/id_rsa.pub root@<BACKUP-IP>` (bzw. Key des
+   Backup-Servers dort in `authorized_keys` eintragen).
+4. Auf dem Backup-Server Konfiguration anlegen:
+   `cp scripts/backup-orchestrator.env.example scripts/backup-orchestrator.env`
+   und `DB_HOST`, `SERVER_PORTAL_HOST`, `SERVER_LANDING_HOST`, `SERVER_BOT_HOST`,
+   `SERVER_WEBID_HOST`, `BACKUP_DIR`, `BACKUP_RETENTION_DAYS` eintragen.
+5. Zeitplan aktivieren: `bash scripts/install-backup-orchestrator.sh`
+   (sichert automatisch alle 6 Stunden: Datenbank-Dump, Supabase-Volumes,
+   Configs und alle fünf Server; hält 14 Tage täglich + 90 Tage monatlich).
+6. Erstlauf und Kontrolle: `bash scripts/backup-orchestrator.sh full`,
+   danach `ls -lt /var/backups/portal/daily/ | head`.
+   Der Status erscheint auch im Portal unter `/admin/infrastructure`.
+7. Empfohlen: Verschlüsselung aktivieren (`age-keygen`, öffentlichen Schlüssel
+   in die Backup-Konfiguration, privaten Schlüssel in den Passwortmanager) und
+   einmal eine Probe-Wiederherstellung auf einem Wegwerf-Server testen.
+
+**Datenverlust im Ernstfall: maximal 6 Stunden.** Wenn du weniger willst, den
+Timer in `scripts/systemd/backup-orchestrator.timer` auf stündlich stellen.
+
+## Phase 1 — Vorbereitung für den Umzug (keine Ausfallzeit)
 
 1. Server bestellen (Ubuntu 22.04/24.04):
    - Backend (neu): 4 vCPU, 8 GB RAM, 160 GB SSD
    - Frontend/Portal (neu): 2 vCPU, 4 GB RAM, 40 GB SSD
 2. In Cloudflare TTL der A-Records (mb-portal.com, api.mb-portal.com) auf 300 senken.
-3. Auf dem alten Backend `.123`: frisches Vollbackup erzeugen
-   (`bash scripts/backup.sh full`) und auf den neuen Server kopieren.
+3. Frisches Vollbackup ziehen (Backup-Server: `bash scripts/backup-orchestrator.sh full`)
+   und das Archiv auf den neuen Backend-Server kopieren.
 
 ## Phase 2 — Backend-Server neu aufbauen (parallel, Portal läuft weiter)
 
