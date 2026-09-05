@@ -4,6 +4,7 @@
 
 | Phase | Dauer | Ausfallzeit? |
 |---|---|---|
+| Backup-Server aufsetzen (einmalig, vorab) | 2–3 h | nein |
 | Neue Server bestellen + OS installieren | 0,5–2 h (je nach Provider) | nein |
 | Backend parallel auf neuem Server aufbauen (Supabase-Stack + Datenbank-Restore) | 2–4 h | nein |
 | Frontend parallel auf neuem Server aufbauen | 0,5–1 h | nein |
