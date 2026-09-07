@@ -23,7 +23,8 @@
 #   caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
 
 {
-	email {$ACME_EMAIL}
+	# Kein ACME/E-Mail nötig: Zertifikate kommen aus Caddys lokaler CA
+	# ("tls internal" weiter unten), Cloudflare-Modus "Full".
 
 	on_demand_tls {
 		ask http://127.0.0.1:3001/_internal/ask
