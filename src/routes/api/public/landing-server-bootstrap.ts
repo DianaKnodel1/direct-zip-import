@@ -214,7 +214,7 @@ if grep -q 'Bun\.serve' "$INSTALL_DIR/server.js"; then
   echo "[bootstrap] ❌ server.js ist noch die alte Bun-Version." >&2
   exit 1
 fi
-if ! grep -qE 'node:http|createServer' "$INSTALL_DIR/server.js"; then
+if ! grep -q "createServer" "$INSTALL_DIR/server.js" && ! grep -q "node:http" "$INSTALL_DIR/server.js"; then
   echo "[bootstrap] ❌ server.js sieht nicht wie der Node-Renderer aus." >&2
   exit 1
 fi
