@@ -1,29 +1,38 @@
-# Landing-Generator: „Seite duplizieren" statt Neu-Erstellen
+# Neuer Landing-Page-Server: Setup abschließen
 
-## Ziel
-Bestehende Landing Page mit einem Klick komplett kopieren (Theme, Branding, alle Texte/Slots, Einstellungen) und als neue, editierbare Seite öffnen — du änderst dann nur noch, was anders sein soll. Kein neuer Generator, kein Umbau des Bestehenden.
+## Aktueller Stand
+- Server gekauft, SSH-Login funktioniert, Code liegt unter `/opt/src/portal/landing-server`.
+- `setup.sh` ist am Export-Schritt gescheitert: Die Platzhalter `<anon-key>` und `<Token aus /admin/infrastructure>` wurden mit den spitzen Klammern eingetippt — die Shell bricht bei `<`/`>` ab. Deshalb fehlte `SUPABASE_PUBLISHABLE_KEY`.
 
-## Was gebaut wird
+## Nächste Schritte (vom User auf dem Server auszuführen)
 
-### 1. „Duplizieren"-Button in der Landing-Liste
-- In `src/routes/admin.landing-generator.tsx` bekommt jede gespeicherte Landing in der Liste neben „Bearbeiten" einen **„Kopieren"**-Button.
-- Klick → lädt die komplette Landing (Theme, Branding, Slot-Texte, Logo, Flow-Typ, Interview-/Booking-Einstellungen) in den Editor, **ohne** sie zu überschreiben:
-  - `editingId` wird geleert → Speichern erzeugt eine **neue** Seite
-  - Firmenname bekommt „ (Kopie)" angehängt
-  - Domain, Slug und Tenant-ID werden **geleert** (müssen bewusst neu gesetzt werden, damit nicht zwei Seiten auf derselben Domain/demselben Mandanten landen)
-- Alles andere bleibt 1:1 erhalten.
+### 1. Echte Werte besorgen
+- **Anon-Key** (`SUPABASE_PUBLISHABLE_KEY`): im Portal unter `/admin/infrastructure` bzw. aus der Backend-Konfiguration (derselbe Key wie im Frontend `.env`).
+- **Bootstrap-Token** (`LANDING_SERVER_TOKEN`): im Portal unter `/admin/infrastructure` erzeugen/anzeigen.
 
-### 2. Vorbelegung aus bestehender Seite beim „Neu"
-- Beim Klick auf „Neue Landing" erscheint künftig optional eine Auswahl: **„Leer starten"** oder **„Von Vorlage übernehmen"** (Dropdown mit allen bestehenden Landings) — gleiche Logik wie Duplizieren.
+### 2. Exports erneut setzen — mit echten Werten, OHNE spitze Klammern
+```bash
+export SUPABASE_URL=https://api.mb-portal.com
+export SUPABASE_PUBLISHABLE_KEY=hier-den-echten-key-einfuegen
+export PORTAL_API_ENDPOINT=https://portal.mb-portal.com/api/public/applications
+export ACME_EMAIL=admin@mb-portal.com
+export LANDING_SERVER_TOKEN=hier-den-echten-token-einfuegen
+bash setup.sh
+```
+Wichtig: Werte direkt einfügen, keine `<` `>`, keine Anführungszeichen nötig (außer der Wert enthält Leerzeichen — tut er normalerweise nicht).
 
-### 3. Nicht kopiert werden (Sicherheit)
-- Domain/Slug (darf nicht doppelt vergeben sein)
-- Tenant-ID, Partner-Verknüpfung, Calendly-URL der verknüpften Fast-Track-Seite — werden geleert, damit keine Bewerbung versehentlich beim falschen Mandanten landet.
+### 3. Verifikation nach dem Setup
+```bash
+systemctl status landing caddy landing-agent --no-pager | head -30
+curl -s http://127.0.0.1:3000/health
+```
 
-## Bewusst NICHT im Plan
-- Kein neuer Generator-Assistent/Wizard (der aktuelle Editor bleibt)
-- Keine Änderung an Themes, Landing-Server oder DNS-Logik
+### 4. DNS umstellen
+Alle Landing-Domains in Cloudflare per A-Record auf die IP des neuen Servers zeigen lassen; Caddy holt die Zertifikate dann automatisch beim ersten Aufruf.
+
+### 5. Alten Landing-Server außer Betrieb nehmen
+Erst wenn neue Domains mit HTTPS erreichbar sind, alten Server (.234) abschalten/kündigen.
 
 ## Technische Details
-- Änderungen nur in `src/routes/admin.landing-generator.tsx`: neuer `handleDuplicateLanding(id)` (baut auf `getLandingPage` + `normalizeSlotsForTheme` auf, analog `handleEditLanding`, aber ohne `editingId` und mit bereinigten Feldern), plus Button in der Liste und Vorlagen-Auswahl beim Neu-Dialog.
-- Keine Datenbank-Migration nötig.
+- Kein Code-Eingriff nötig; es ist ein reiner Shell-Bedienungsfehler gewesen.
+- Falls `setup.sh` erneut meckert, welche Variable fehlt, die Ausgabe hier einfügen.
