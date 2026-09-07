@@ -13,16 +13,19 @@ Besucher ──► Cloudflare (DDoS-Filter, WAF, echte IP bleibt versteckt)
 
 ## Teil 1 — Cloudflare (macht die IP unsichtbar)
 
-In Cloudflare pro Landing-Domain:
+Die Landing-Domains liegen in **vielen verschiedenen Cloudflare-Konten**
+(je Kunde/Seite eines). Deshalb wird **kein** Origin-Zertifikat pro Konto
+gepflegt — Caddy stellt sich für jede Domain automatisch selbst ein
+Zertifikat aus (lokale CA). Pro Domain sind daher nur zwei Klicks nötig:
 
 1. **DNS:** A-Record auf die Server-IP (z. B. `190.97.165.152`), Status
    **Proxied** (orange Wolke). Damit sieht die Welt nur noch Cloudflare-IPs.
-2. **SSL/TLS → Overview:** Verschlüsselungsmodus **Full (strict)**.
-3. **SSL/TLS → Origin Server → Create Certificate:** Origin-Zertifikat
-   erzeugen (RSA, 15 Jahre). Die beiden Ausgaben speichern:
-   - Zertifikat → `/etc/caddy/certs/landing-origin.pem`
-   - Privater Schlüssel → `/etc/caddy/certs/landing-origin.key`
-4. Empfohlen, einmalig pro Zone:
+2. **SSL/TLS → Overview:** Verschlüsselungsmodus **Full**
+   (nicht *Full (strict)*, sonst lehnt Cloudflare das selbst ausgestellte
+   Zertifikat ab). Die Verbindung Besucher ↔ Cloudflare ↔ Server ist
+   trotzdem durchgehend verschlüsselt; gegen Direktzugriffe schützt die
+   Firewall aus Teil 2, die nur Cloudflare-IPs durchlässt.
+3. Empfohlen, einmalig pro Zone:
    - **Security → Bots:** *Bot Fight Mode* an.
    - **Security → Settings:** *Security Level* mindestens *Medium*; im
      Notfall (aktiver Angriff) *Under Attack Mode* einschalten.
@@ -30,11 +33,10 @@ In Cloudflare pro Landing-Domain:
      formular, z. B. `http.request.uri.path eq "/api/public/applications"`
      → max. 10 Requests/Minute pro IP, Aktion *Block*.
 
-**Achtung Kunden-Domains:** Liegt die Domain nicht in Ihrem Cloudflare-Konto
-(Kunde pflegt sie selbst), kann dort kein Proxy aktiviert werden — die
-Server-IP bleibt für diese Domain sichtbar. Lösung: Kunden bitten, die
-Domain in Ihr Cloudflare zu übertragen, oder Cloudflare *Custom Hostnames*
-(SaaS) buchen.
+**Achtung Kunden-Domains:** Liegt die Domain in keinem Cloudflare-Konto und
+läuft ungeproxyt, bleibt die Server-IP für diese Domain sichtbar. Lösung:
+Kunden bitten, die Domain über Cloudflare (kostenloser Tarif genügt) laufen
+zu lassen — oder Cloudflare *Custom Hostnames* (SaaS) buchen.
 
 ## Teil 2 — Auf dem Landing-Server (einmalig ausführen)
 
@@ -45,10 +47,14 @@ Voraussetzung: SSH-Zugang per Schlüssel funktioniert (sonst zuerst
 apt-get update && apt-get install -y git rsync
 git clone https://github.com/DianaKnodel1/direct-zip-import.git /opt/src/portal   # falls noch nicht vorhanden
 
-# 1) Caddy auf Cloudflare-Betrieb umstellen (Origin-Zertifikat statt LE)
-mkdir -p /etc/caddy/certs
+# 1) Caddy auf Cloudflare-Betrieb umstellen (lokale CA, keine Zertifikatspflege)
 cp /opt/src/portal/landing-server/Caddyfile.cloudflare /etc/caddy/Caddyfile
-# → vorher die Origin-Zertifikat-Dateien nach /etc/caddy/certs/ legen (Teil 1)
+caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
+
+# 2) Härtung: Firewall (nur Cloudflare auf 80/443), fail2ban, SSH, Auto-Updates
+bash /opt/src/portal/scripts/harden-landing-server.sh
+```
+
 
 # 2) Härtung: Firewall (nur Cloudflare auf 80/443), fail2ban, SSH, Auto-Updates
 bash /opt/src/portal/scripts/harden-landing-server.sh
