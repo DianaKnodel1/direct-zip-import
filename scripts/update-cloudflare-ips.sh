@@ -50,11 +50,16 @@ else
   PREV_FILE="$STATE_DIR/ips.prev"
   [ -f "$PREV_FILE" ] || touch "$PREV_FILE"
 
-  # a) Regeln für Bereiche entfernen, die nicht mehr in der Liste sind
-  comm -23 <(sort -u "$PREV_FILE") <(sort -u "$TMP/ips") | while IFS= read -r old; do
-    [ -n "$old" ] || continue
-    ufw --force delete allow from "$old" to any port 80,443 proto tcp comment "$RULE_COMMENT" >/dev/null 2>&1 || true
-    log "Entfernt: $old"
+  # a) cf-landing-Regeln entfernen, deren Bereich nicht mehr in der Liste ist
+  #    (Löschen nach Regelnummer, absteigend — robust gegen ufw-Kommentar-Syntax)
+  CF_ALT=$(printf '%s|' $(cat "$TMP/ips")); CF_ALT="${CF_ALT%|}"
+  mapfile -t STALE_NUMS < <(ufw status numbered \
+    | grep -F "$RULE_COMMENT" \
+    | grep -vE "(${CF_ALT})" \
+    | grep -oE '^\[[ 0-9]+\]' | grep -oE '[0-9]+' | sort -rn)
+  for n in "${STALE_NUMS[@]}"; do
+    ufw --force delete "$n" >/dev/null 2>&1 || true
+    log "Entfernt: Regel #$n (Bereich nicht mehr in der Cloudflare-Liste)"
   done
 
   # b) Regeln für neue Bereiche hinzufügen (idempotent: nur wenn noch nicht vorhanden)
