@@ -1,0 +1,63 @@
+# Caddyfile für Server 1 (Landings) im Cloudflare-Proxy-Betrieb.
+#
+# Verwenden, sobald die Landing-Domains in Cloudflare über die orange Wolke
+# (Proxied) laufen. Dann kann Caddy keine Let's-Encrypt-Zertifikate mehr per
+# "on demand" holen — stattdessen wird ein Cloudflare-Origin-Zertifikat
+# verwendet (siehe docs/SERVER-HARDENING.md).
+#
+# Voraussetzungen:
+#   /etc/caddy/certs/landing-origin.pem + .key  (Cloudflare-Origin-Zertifikat)
+#   /etc/caddy/cloudflare-trusted.caddy         (wird von
+#     scripts/update-cloudflare-ips.sh automatisch erzeugt/aktualisiert)
+#
+# Installation:
+#   cp /opt/landing-server/Caddyfile.cloudflare /etc/caddy/Caddyfile
+#   caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
+
+{
+	email {$ACME_EMAIL}
+
+	servers {
+		# Anfragen langsam abweisen statt Ressourcen zu verbrauchen
+		timeouts {
+			read_body   10s
+			read_header 10s
+			write       60s
+			idle        120s
+		}
+	}
+}
+
+# HTTP → HTTPS (erreicht uns ohnehin nur über Cloudflare)
+http:// {
+	redir https://{host}{uri} 308
+}
+
+https:// {
+	tls /etc/caddy/certs/landing-origin.pem /etc/caddy/certs/landing-origin.key
+
+	encode zstd gzip
+
+	request_body {
+		max_size 2MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options    "nosniff"
+		X-Frame-Options           "DENY"
+		Referrer-Policy           "strict-origin-when-cross-origin"
+		Permissions-Policy        "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	reverse_proxy 127.0.0.1:3001 {
+		# Cloudflare-IP-Bereiche als vertrauenswürdig einstufen, damit die
+		# echte Besucher-IP aus X-Forwarded-For übernommen wird.
+		# Wird täglich von update-cloudflare-ips.sh frisch geschrieben.
+		import /etc/caddy/cloudflare-trusted.caddy
+
+		header_up Host {host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
