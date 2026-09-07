@@ -205,7 +205,7 @@ curl -fsSL "$SERVER_FILES_BASE/server.js"  -o "$INSTALL_DIR/server.js"
 curl -fsSL "$SERVER_FILES_BASE/legal-content.js"  -o "$INSTALL_DIR/legal-content.js"
 curl -fsSL "$SERVER_FILES_BASE/package.json"  -o "$INSTALL_DIR/package.json"
 curl -fsSL "$SERVER_FILES_BASE/heartbeat.sh" -o "$INSTALL_DIR/heartbeat.sh"
-if head -c 32 "$INSTALL_DIR/server.js" | grep -qi '<!DOCTYPE html\|<html'; then
+if head -c 32 "$INSTALL_DIR/server.js" | grep -qiE '<!DOCTYPE html|<html'; then
   echo "[bootstrap] ❌ server.js Download enthält HTML statt JavaScript." >&2
   echo "[bootstrap]    Prüfe URL: $SERVER_FILES_BASE/server.js" >&2
   exit 1
@@ -214,7 +214,7 @@ if grep -q 'Bun\.serve' "$INSTALL_DIR/server.js"; then
   echo "[bootstrap] ❌ server.js ist noch die alte Bun-Version." >&2
   exit 1
 fi
-if ! grep -q 'node:http\|createServer' "$INSTALL_DIR/server.js"; then
+if ! grep -qE 'node:http|createServer' "$INSTALL_DIR/server.js"; then
   echo "[bootstrap] ❌ server.js sieht nicht wie der Node-Renderer aus." >&2
   exit 1
 fi
