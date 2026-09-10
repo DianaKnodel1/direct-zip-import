@@ -69,10 +69,13 @@ ok "Datenbank-Dump: $(du -h "${RUN_DIR}/db.dump" | cut -f1)"
 # ── 2/3  Volumes & Configs von Backend-Server holen ─────────────────────────
 log "2/3  Backend-Volumes & Configs von ${DB_HOST} holen"
 mkdir -p "${RUN_DIR}/backend"
-rsync -avz -e "ssh ${SSH_OPTS}" "root@${DB_HOST}:/opt/supabase" "${RUN_DIR}/backend/" \
-  --exclude='docker/*' --exclude='*.log' --exclude='tmp' || warn "Backend-Supabase sync fehlgeschlagen"
-rsync -avz -e "ssh ${SSH_OPTS}" "root@${DB_HOST}:/opt/apps/portal" "${RUN_DIR}/backend/" \
-  --exclude='node_modules' --exclude='dist' --exclude='.output' --exclude='*.log' || warn "Backend-Portal sync fehlgeschlagen"
+RSYNC_EXCLUDES=(--exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='.output'
+  --exclude='*.log' --exclude='tmp' --exclude='docker/*' --exclude='.cache' --exclude='.pnpm-store')
+
+rsync -az --info=stats1 -e "ssh ${SSH_OPTS}" "root@${DB_HOST}:/opt/supabase" "${RUN_DIR}/backend/" \
+  "${RSYNC_EXCLUDES[@]}" || warn "Backend-Supabase sync fehlgeschlagen"
+rsync -az --info=stats1 -e "ssh ${SSH_OPTS}" "root@${DB_HOST}:/opt/apps/portal" "${RUN_DIR}/backend/" \
+  "${RSYNC_EXCLUDES[@]}" || warn "Backend-Portal sync fehlgeschlagen"
 ok "Backend-Dateien gesichert"
 
 # ── 3/3  Weitere Server holen ───────────────────────────────────────────────
@@ -83,8 +86,8 @@ pull_server() {
   [ -z "${host}" ] && return
   info "Sichere ${name} (${host}:${src_dir})"
   mkdir -p "${RUN_DIR}/${name}"
-  if rsync -avz -e "ssh ${SSH_OPTS}" "root@${host}:${src_dir}/" "${RUN_DIR}/${name}/" \
-    --exclude='node_modules' --exclude='dist' --exclude='.output' --exclude='*.log' --exclude='tmp'; then
+  if rsync -az --info=stats1 -e "ssh ${SSH_OPTS}" "root@${host}:${src_dir}/" "${RUN_DIR}/${name}/" \
+    "${RSYNC_EXCLUDES[@]}"; then
     ok "${name} gesichert"
   else
     warn "${name} nicht erreichbar oder leer"
