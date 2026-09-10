@@ -71,6 +71,9 @@ log "2/3  Backend-Volumes & Configs von ${DB_HOST} holen"
 mkdir -p "${RUN_DIR}/backend"
 RSYNC_EXCLUDES=(
   --exclude='.git/'
+  --exclude='.releases/'
+  --exclude='.tanstack/'
+  --exclude='.wrangler/'
   --exclude='node_modules/'
   --exclude='dist/'
   --exclude='.output/'
