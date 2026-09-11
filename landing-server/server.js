@@ -789,6 +789,13 @@ const server = createServer(async (req, res) => {
     if (path === "/datenschutz" || path === "/datenschutz.html") {
       return send(res, 200, renderLegal(row, "datenschutz"), { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" });
     }
+    const blogMatch = /^\/blog\/([1-9][0-9]?)(?:\.html)?$/.exec(path);
+    if (blogMatch) {
+      const html = renderBlogPost(row, Number(blogMatch[1]));
+      if (html) return send(res, 200, html, { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" });
+      return send(res, 302, "", { location: "/#blog" });
+    }
+    if (path === "/blog" || path === "/blog/") return send(res, 302, "", { location: "/#blog" });
     return send(res, 404, "not found");
   } catch (e) {
     console.error("[landing-server] request error:", e?.message || e);
