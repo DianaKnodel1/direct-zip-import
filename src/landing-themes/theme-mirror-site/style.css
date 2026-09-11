@@ -273,3 +273,7 @@ img    { max-width: 100%; display: block; }
   .bpo-schedule-card { padding: 32px 24px; }
   .bpo-schedule-card h4 { font-size: 22px; }
 }
+
+/* Blog: Weiterlesen-Link */
+.bpo-readmore { display:inline-block; margin-top:10px; font-weight:600; color:var(--bpo-primary, #1d4ed8); text-decoration:none; }
+.bpo-readmore:hover { text-decoration:underline; }
