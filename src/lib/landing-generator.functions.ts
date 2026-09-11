@@ -256,12 +256,27 @@ function stripThemeLegalLinks(html: string): string {
       /<(h\d|div|p|span)([^>]*)>\s*Anbieterkennzeichnung\s*<\/\1>(?=\s*(?:<\/(?:div|nav|ul|section)>|\s*$))/gi,
       "",
     );
+    // übrig gebliebene Trenner (· | –) am Zeilenende/aneinander aufräumen
+    out = out.replace(/(?:&nbsp;|\s)*[·|•–-](?:&nbsp;|\s)*(?=(?:&nbsp;|\s)*(?:<\/p>|<\/li>|<\/div>|<br\s*\/?>))/gi, "");
+    out = out.replace(/((?:&nbsp;|\s)*[·|•](?:&nbsp;|\s)*){2,}/gi, " · ");
     // leere Container aufräumen
     for (let i = 0; i < 2; i++) {
       out = out.replace(/<(ul|nav|div)([^>]*)>\s*<\/\1>/gi, "");
     }
     return out;
   });
+}
+
+// Erkennt, ob das Theme bereits einen vollwertigen, mehrspaltigen Footer mit
+// Impressum-/Datenschutz-Links hat. Dann wird KEIN zweiter großer Footer
+// angehängt, sondern nur eine schmale Anbieterkennzeichnungs-Leiste.
+function hasRichThemeFooter(html: string): boolean {
+  const m = html.match(/<footer[\s\S]*?<\/footer>/i);
+  if (!m) return false;
+  const f = m[0];
+  const hasLegal = /Impressum/i.test(f) && /Datenschutz/i.test(f);
+  const headings = (f.match(/<h[1-4][\s>]/gi) || []).length;
+  return hasLegal && headings >= 3;
 }
 
 // Injiziert einen professionellen Trust-Footer (Impressum, Kontakt, Rechtliches)
