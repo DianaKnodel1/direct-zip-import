@@ -313,6 +313,20 @@ function injectTrustFooter(html: string, b: z.infer<typeof BrandingSchema>): str
   const claim = b.flow_type === "fast"
     ? "Schnell, digital und persönlich begleitet — von der Bewerbung bis zum Start."
     : "Ihre Personalvermittlung — wir bringen Sie mit passenden Partnerunternehmen zusammen.";
+  // Theme hat bereits einen vollständigen Footer → nur schmale Rechtsleiste,
+  // damit nicht zwei Footer untereinander stehen.
+  if (richFooter) {
+    const slim = `
+<section class="lv-legal-bar lv-legal-block" style="background:#0b1220;color:#94a3b8;padding:18px 24px;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-size:12.5px;line-height:1.8;">
+  <div style="max-width:1180px;margin:0 auto;text-align:center;">
+    <div style="color:#cbd5e1;">${legalItems.join(" &middot; ").replace(/<strong>|<\/strong>/g, "")}</div>
+    <div style="margin-top:6px;">Die Übertragung Ihrer Bewerbungsdaten erfolgt TLS-verschlüsselt. &middot; <a href="impressum.html" style="color:inherit;">Impressum</a> &middot; <a href="datenschutz.html" style="color:inherit;">Datenschutzerklärung</a></div>
+  </div>
+</section>`;
+    if (/<\/footer>/i.test(html)) return html.replace(/<\/footer>/i, "</footer>" + slim);
+    if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, slim + "\n</body>");
+    return html + slim;
+  }
   const block = `
 <section class="lv-trust-footer lv-legal-block" style="background:#0f172a;color:#e2e8f0;padding:64px 24px 32px;margin-top:64px;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;">
   <div style="max-width:1180px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:40px;">
