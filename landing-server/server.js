@@ -576,6 +576,89 @@ function renderLegal(row, type) {
   });
 }
 
+// ── Blog-Beitragsseiten (/blog/1..3) ─────────────────────────────────────
+const BLOG_IMAGES = { 1: "/assets/blog5.jpg", 2: "/assets/blog4.jpg", 3: "/assets/blog6.jpg" };
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+function renderBlogPost(row, n) {
+  const slots = row.slots || {};
+  const branding = row.branding || {};
+  const title = slots[`blog_post_${n}_title`];
+  if (!title) return null;
+  const date = slots[`blog_post_${n}_date`] || "";
+  const excerpt = slots[`blog_post_${n}_excerpt`] || "";
+  const bodyText = slots[`blog_post_${n}_body`] || excerpt;
+  const firm = esc(branding.firmenname || "");
+  const primary = /^#[0-9a-fA-F]{6}$/.test(branding.primary_color || "") ? branding.primary_color : "#1d4ed8";
+  const paragraphs = String(bodyText)
+    .split(/\n{2,}|\r\n\r\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `<p>${esc(p).replace(/\n/g, "<br/>")}</p>`)
+    .join("\n");
+  const brand = row.logo_url
+    ? `<img src="/assets/logo" alt="${firm}" class="bp-logo" />`
+    : `<span class="bp-wordmark">${firm}</span>`;
+
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>${esc(title)} – ${firm}</title>
+<meta name="description" content="${esc(excerpt)}" />
+<meta property="og:title" content="${esc(title)}" />
+<meta property="og:description" content="${esc(excerpt)}" />
+<meta property="og:type" content="article" />
+<style>
+  :root { --bp-accent:${primary}; --bp-ink:#111827; --bp-muted:#5b6472; --bp-line:#e4e7ec; }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#fff;color:var(--bp-ink);
+    font-family:"Plus Jakarta Sans","Manrope",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    font-size:16px;line-height:1.72;-webkit-font-smoothing:antialiased}
+  a{color:var(--bp-accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .bp-header{border-bottom:1px solid var(--bp-line)}
+  .bp-header-inner{max-width:920px;margin:0 auto;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+  .bp-logo{height:34px;width:auto;display:block}
+  .bp-wordmark{font-size:17px;font-weight:700;letter-spacing:-.01em;color:var(--bp-ink)}
+  .bp-back{font-size:14px;color:var(--bp-muted);white-space:nowrap}
+  .bp-main{max-width:920px;margin:0 auto;padding:48px 24px 80px}
+  .bp-date{display:inline-block;background:var(--bp-accent);color:#fff;font-size:13px;font-weight:600;padding:4px 12px;border-radius:4px}
+  h1{font-size:38px;line-height:1.18;letter-spacing:-.02em;margin:16px 0 12px}
+  .bp-lead{color:var(--bp-muted);font-size:17px;margin:0 0 28px;max-width:64ch}
+  .bp-cover{width:100%;height:auto;border-radius:10px;margin:0 0 32px;display:block}
+  .bp-body p{margin:0 0 16px;max-width:70ch}
+  .bp-cta{margin-top:40px;padding-top:28px;border-top:1px solid var(--bp-line);display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .bp-btn{background:var(--bp-accent);color:#fff;padding:12px 24px;border-radius:999px;font-weight:600}
+  .bp-btn:hover{text-decoration:none;opacity:.9}
+  .bp-footer{border-top:1px solid var(--bp-line);padding:24px;text-align:center;font-size:13px;color:var(--bp-muted)}
+  @media(max-width:640px){h1{font-size:28px}}
+</style>
+</head>
+<body>
+<header class="bp-header"><div class="bp-header-inner"><a href="/">${brand}</a><a class="bp-back" href="/#blog">← Zurück zum Blog</a></div></header>
+<main class="bp-main">
+  <article>
+    ${date ? `<span class="bp-date">${esc(date)}</span>` : ""}
+    <h1>${esc(title)}</h1>
+    ${excerpt ? `<p class="bp-lead">${esc(excerpt)}</p>` : ""}
+    <img class="bp-cover" src="${BLOG_IMAGES[n]}" alt="${esc(title)}" />
+    <div class="bp-body">${paragraphs}</div>
+    <div class="bp-cta">
+      <a class="bp-btn" href="/#bewerbung-form">Jetzt bewerben</a>
+      <a href="/#blog">Weitere Beiträge</a>
+    </div>
+  </article>
+</main>
+<footer class="bp-footer">© ${new Date().getFullYear()} ${firm} · <a href="/impressum.html">Impressum</a> · <a href="/datenschutz.html">Datenschutz</a></footer>
+</body>
+</html>`;
+}
+
 function renderCss(row) {
   return loadTheme(row.theme_id).then((theme) => theme ? applyPlaceholders(theme.css, row.branding, row.slots) : "/* theme missing */");
 }
