@@ -285,7 +285,8 @@ function hasRichThemeFooter(html: string): boolean {
 // das Theme die Anbieterkennzeichnung schon eingebaut).
 function injectTrustFooter(html: string, b: z.infer<typeof BrandingSchema>): string {
   if (/lv-legal-block/.test(html)) return html; // schon vorhanden
-  html = stripThemeLegalLinks(html);
+  const richFooter = hasRichThemeFooter(html);
+  if (!richFooter) html = stripThemeLegalLinks(html);
   const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!
   ));
