@@ -397,10 +397,11 @@ function renderThanks(row: LandingRow, params: URLSearchParams): string {
   const logo = row.logo_url ? `<img src="/assets/logo" alt="${firm}" style="max-height:44px;width:auto;">` : `<span style="font-weight:800;font-size:19px;color:#0f172a;">${firm}</span>`;
   const bookingHtml = token
     ? `<div id="booking-inline-host" data-token="${esc(token)}" data-mail="${esc(mail)}" data-mail-reason="${esc(mailReason)}" style="margin-top:28px;"></div>
-       ${safeNext ? `<noscript><a class="lv-thanks-btn" href="${esc(safeNext)}">Termin buchen</a></noscript>
-       <div id="booking-fallback" style="margin-top:18px;display:none;"><a class="lv-thanks-btn" href="${esc(safeNext)}">Termin buchen</a></div>
+       ${safeNext ? `<noscript><a class="lv-thanks-btn" href="${esc(safeNext)}">Jetzt Termin vereinbaren \u2192</a></noscript>
+       <div id="booking-fallback" style="margin-top:18px;display:none;"><a class="lv-thanks-btn" href="${esc(safeNext)}">Jetzt Termin vereinbaren \u2192</a></div>
        <script>setTimeout(function(){var h=document.getElementById('booking-inline-host');var f=document.getElementById('booking-fallback');if(f&&h&&!h.children.length)f.style.display='block';},2500);<\/script>` : ""}`
-    : (safeNext ? `<a class="lv-thanks-btn" href="${esc(safeNext)}">Jetzt weiter zum n\u00e4chsten Schritt</a>` : "");
+    : (safeNext ? `<a class="lv-thanks-btn" href="${esc(safeNext)}" target="_blank" rel="noopener">Jetzt Termin vereinbaren \u2192</a>
+       <p style="margin:12px 0 0;font-size:13px;color:#94a3b8;">Es \u00f6ffnet sich ein neues Fenster zur Terminauswahl.</p>` : "");
   const partnerLine = partner ? `<p style="color:#475569;">Ihre Bewerbung wurde an <strong>${esc(partner)}</strong> weitergeleitet.</p>` : "";
   const head = `<!doctype html><html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -425,7 +426,7 @@ ${row.favicon_url ? '<link rel="icon" href="/assets/favicon">' : ""}
   <h1>Vielen Dank f\u00fcr Ihre Bewerbung!</h1>
   <p>Ihre Angaben sind bei uns eingegangen. Sie erhalten in K\u00fcrze eine Best\u00e4tigung per E-Mail \u2014 bitte pr\u00fcfen Sie auch Ihren Spam-Ordner.</p>
   ${partnerLine}
-  ${token ? `<p><strong>Letzter Schritt:</strong> W\u00e4hlen Sie unten Ihren Wunschtermin f\u00fcr das Kennenlerngespr\u00e4ch.</p>` : ""}
+  ${token || safeNext ? `<p><strong>Letzter Schritt:</strong> W\u00e4hlen Sie jetzt Ihren Wunschtermin f\u00fcr das Kennenlerngespr\u00e4ch.</p>` : ""}
   ${bookingHtml}
 </div></main>
 <div class="lv-thanks-foot">${firm ? esc(firm) + " \u00b7 " : ""}<a href="/impressum.html">Impressum</a> \u00b7 <a href="/datenschutz.html">Datenschutz</a></div>
