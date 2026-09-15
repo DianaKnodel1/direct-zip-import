@@ -921,6 +921,13 @@ const server = createServer(async (req, res) => {
       return send(res, status, body, { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" });
     }
 
+    if (path === "/bewerben" || path === "/bewerben.html") {
+      const { body, status } = await renderHtml(row, host, "apply");
+      return send(res, status, body, { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" });
+    }
+    if (path === "/danke" || path === "/danke.html") {
+      return send(res, 200, renderThanks(row, url.searchParams), { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" });
+    }
     if (path === "/impressum" || path === "/impressum.html") {
       return send(res, 200, renderLegal(row, "impressum"), { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" });
     }

@@ -618,6 +618,13 @@ const server = Bun.serve({
       const { body, status } = renderHtml(row, host);
       return new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
     }
+    if (path === "/bewerben" || path === "/bewerben.html") {
+      const { body, status } = renderHtml(row, host, "apply");
+      return new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
+    }
+    if (path === "/danke" || path === "/danke.html") {
+      return new Response(renderThanks(row, url.searchParams), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
+    }
     if (path === "/impressum" || path === "/impressum.html") {
       return new Response(renderLegal(row, "impressum"), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
     }
