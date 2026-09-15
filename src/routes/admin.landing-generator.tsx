@@ -78,6 +78,7 @@ type Branding = {
   landing_domain: string;
   api_endpoint: string;
   portal_url: string;
+  meta_pixel_id: string;
   portal_theme: PortalThemeId;
 
   supabase_url: string;
@@ -125,6 +126,7 @@ const EMPTY: Branding = {
   landing_domain: "",
   api_endpoint: "",
   portal_url: "",
+  meta_pixel_id: "",
   portal_theme: "clean",
 
   supabase_url: "",
@@ -713,6 +715,7 @@ document.addEventListener('submit', function(e){
           hrb: b.hrb, registergericht: b.registergericht, ust_id: b.ust_id, steuernummer: b.steuernummer,
           geschaeftsfuehrer: b.geschaeftsfuehrer, impressum: b.impressum,
           api_endpoint: b.api_endpoint, portal_url: b.portal_url, tenant_id: b.tenant_id,
+          meta_pixel_id: (b.meta_pixel_id || "").trim(),
           portal_theme: b.portal_theme || "clean",
 
           seo_title: b.seo_title, seo_description: b.seo_description, seo_image: b.seo_image,
@@ -1238,6 +1241,13 @@ document.addEventListener('submit', function(e){
                   />
                   <p className="text-[10px] text-muted-foreground mt-1">
                     Wird mit jeder Bewerbung gespeichert (<code>source_slug</code>). So siehst du im Funnel-Panel: <em>1000 Bewerbungen → 650 registriert → 210 abgeschlossen</em>. Leer = Domain wird automatisch genutzt.
+                  </p>
+                </Field>
+                <Field label="Meta-/Facebook-Pixel-ID (optional)">
+                  <Input value={branding.meta_pixel_id} onChange={set("meta_pixel_id")} placeholder="z.B. 1234567890123456" />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Leer = kein Pixel, kein Cookie-Hinweis. Gefüllt: Das Pixel lädt auf allen Seiten der Landing Page und meldet auf <code>/danke</code> das Ereignis <code>Lead</code>.
+                    In Europa erscheint vorher ein schlanker Einwilligungs-Hinweis; erst nach „Einverstanden“ lädt das Pixel.
                   </p>
                 </Field>
                 <Field label="API-Endpoint für Bewerbungen *">

@@ -8,7 +8,7 @@
  * beide Dateien anpassen und die Version hochzählen.
  */
 
-export const LEGAL_CONTENT_VERSION = "2026-07-26.1";
+export const LEGAL_CONTENT_VERSION = "2026-09-15.1";
 
 export function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -176,7 +176,11 @@ export function renderDatenschutz(b = {}) {
   out.push(
     section(
       "4. Cookies und Reichweitenmessung",
-      `<p>Diese Website setzt ausschließlich technisch notwendige Cookies ein, die für den Betrieb und die Übermittlung des Bewerbungsformulars erforderlich sind. Eine Auswertung Ihres Nutzungsverhaltens zu Werbezwecken oder eine Weitergabe an Werbenetzwerke findet nicht statt. Sollten künftig Analyse- oder Marketing-Dienste eingesetzt werden, geschieht dies ausschließlich auf Grundlage Ihrer vorherigen Einwilligung nach Art.&nbsp;6 Abs.&nbsp;1 lit.&nbsp;a DSGVO.</p>`,
+      String(b.meta_pixel_id || "").trim()
+        ? `<p>Diese Website setzt technisch notwendige Cookies ein, die für den Betrieb und die Übermittlung des Bewerbungsformulars erforderlich sind.</p>
+       <p><strong>Meta-Pixel (Facebook/Instagram):</strong> Wenn Sie einwilligen, laden wir das Besucher-Aktions-Pixel der Meta Platforms Ireland Limited, 4 Grand Canal Square, Dublin 2, Irland. Damit messen wir den Erfolg unserer Anzeigen: Es wird erfasst, dass Sie diese Website aufgerufen und ggf. das Bewerbungsformular abgeschickt haben (Ereignis „Lead“). Dabei werden Ihre IP-Adresse, Angaben zu Ihrem Gerät und Browser sowie Cookie-Kennungen an Meta übermittelt und können dort mit Ihrem Meta-Konto verknüpft werden. Eine Übermittlung in die USA ist möglich; Meta stützt sich hierfür auf den EU-US Data Privacy Framework bzw. Standardvertragsklauseln.</p>
+       <p>Rechtsgrundlage ist ausschließlich Ihre Einwilligung nach Art.&nbsp;6 Abs.&nbsp;1 lit.&nbsp;a DSGVO und § 25 Abs.&nbsp;1 TDDDG. Ohne Einwilligung wird das Pixel nicht geladen. Sie können Ihre Einwilligung jederzeit mit Wirkung für die Zukunft widerrufen — löschen Sie dazu die Websitedaten in Ihrem Browser oder senden Sie uns eine kurze Nachricht an ${mail}. Weitere Informationen: <a href="https://www.facebook.com/privacy/policy" target="_blank" rel="noopener">Datenschutzrichtlinie von Meta</a>.</p>`
+        : `<p>Diese Website setzt ausschließlich technisch notwendige Cookies ein, die für den Betrieb und die Übermittlung des Bewerbungsformulars erforderlich sind. Eine Auswertung Ihres Nutzungsverhaltens zu Werbezwecken oder eine Weitergabe an Werbenetzwerke findet nicht statt. Sollten künftig Analyse- oder Marketing-Dienste eingesetzt werden, geschieht dies ausschließlich auf Grundlage Ihrer vorherigen Einwilligung nach Art.&nbsp;6 Abs.&nbsp;1 lit.&nbsp;a DSGVO.</p>`,
     ),
   );
 

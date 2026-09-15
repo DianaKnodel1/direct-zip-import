@@ -470,6 +470,24 @@
           });
         })
         .then(function(res){form.reset();setStatus('success','Bewerbung erfolgreich gesendet.');
+          // Eigene Danke-Seite (/danke) — echte URL für Meta-/Facebook-Ads.
+          if(window.LANDING_THANKS_URL!==false){
+            try{
+              var redir=(res&&res.redirect_url)||'';
+              var tm=/\/buchen\/([^/?#]+)/.exec(redir);
+              var qs=[];
+              if(tm)qs.push('token='+encodeURIComponent(tm[1]));
+              if(/^https?:\/\//i.test(redir))qs.push('next='+encodeURIComponent(redir));
+              var es=(res&&res.email_status)||null;
+              if(es&&es.status)qs.push('mail='+encodeURIComponent(es.status));
+              if(es&&es.reason)qs.push('mailreason='+encodeURIComponent(es.reason));
+              var br=(res&&res.broker)||null;
+              if(br&&br.partner_name)qs.push('partner='+encodeURIComponent(br.partner_name));
+              if(br&&br.partner_logo)qs.push('partnerlogo='+encodeURIComponent(br.partner_logo));
+              location.assign('/danke'+(qs.length?('?'+qs.join('&')):''));
+              return;
+            }catch(_){}
+          }
           showModal({fast:(window.FLOW_TYPE||'classic')==='fast',whatsapp:window.WHATSAPP_NUMBER||'',redirectUrl:(res&&res.redirect_url)||'',broker:(res&&res.broker)||null,emailStatus:(res&&res.email_status)||null,bookingError:(res&&res.booking_error)||''});})
         .catch(function(err){
           setStatus('error',(err&&err.userMessage)?err.userMessage:'Da ist etwas schiefgelaufen. Bitte später erneut versuchen.');
@@ -477,4 +495,21 @@
         });
     });
   });
+
+  // ── Danke-Seite (/danke): Terminauswahl direkt dort rendern ─────────────
+  window.LandingBooking = { renderInline: renderBookingInline, spamHint: spamHintBox };
+  document.addEventListener('DOMContentLoaded', function(){
+    var host = document.getElementById('booking-inline-host');
+    if(!host || host.getAttribute('data-mounted')==='1') return;
+    var token = host.getAttribute('data-token') || '';
+    if(!token){
+      try{ token = new URLSearchParams(location.search).get('token') || ''; }catch(_){}
+    }
+    if(!token) return;
+    host.setAttribute('data-mounted','1');
+    var mail = host.getAttribute('data-mail') || '';
+    var reason = host.getAttribute('data-mail-reason') || '';
+    renderBookingInline(host, token, { emailStatus: mail||reason ? { status: mail, reason: reason } : null });
+  });
 })();
+

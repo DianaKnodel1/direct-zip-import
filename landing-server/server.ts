@@ -195,7 +195,97 @@ function applyPlaceholders(src: string, branding: Record<string, any>, slots: Re
   return out;
 }
 
-function injectLandingConfig(html: string, row: LandingRow): string {
+// ── Meta-/Facebook-Pixel (optional pro Landing, mit Einwilligung) ─────────
+function buildPixelBlock(row, mode) {
+  const id = String((row.branding || {}).meta_pixel_id || "").trim();
+  if (!/^[0-9]{8,20}$/.test(id)) return "";
+  const lead = mode === "thanks" ? "true" : "false";
+  return `<script>
+(function(){
+  var PIXEL_ID=${JSON.stringify(id)};var FIRE_LEAD=${lead};var KEY='lv_ads_consent';
+  function loadPixel(){
+    if(window.__lvPixelLoaded)return;window.__lvPixelLoaded=true;
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    try{fbq('init',PIXEL_ID);fbq('track','PageView');if(FIRE_LEAD)fbq('track','Lead');}catch(_){}
+  }
+  function stored(){try{return localStorage.getItem(KEY);}catch(_){return null;}}
+  function save(v){try{localStorage.setItem(KEY,v);}catch(_){}}
+  window.lvAdsConsent={grant:function(){save('granted');loadPixel();},deny:function(){save('denied');}};
+  function banner(){
+    if(document.getElementById('lv-consent-bar'))return;
+    function build(){
+      var bar=document.createElement('div');bar.id='lv-consent-bar';
+      bar.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#0f172a;color:#e2e8f0;padding:16px 18px;font:14px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 -8px 30px rgba(0,0,0,.25);';
+      var inner=document.createElement('div');
+      inner.style.cssText='max-width:1100px;margin:0 auto;display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:space-between;';
+      var txt=document.createElement('div');txt.style.cssText='flex:1 1 320px;min-width:260px;';
+      txt.innerHTML='Wir messen mit dem Meta-Pixel, wie unsere Anzeigen genutzt werden. Das ist freiwillig und jederzeit widerrufbar. Mehr dazu in der <a href="/datenschutz.html" style="color:#93c5fd;">Datenschutzerkl\\u00e4rung</a>.';
+      var btns=document.createElement('div');btns.style.cssText='display:flex;gap:10px;flex-wrap:wrap;';
+      function mk(label,bg,fg){var b=document.createElement('button');b.type='button';b.textContent=label;b.style.cssText='padding:10px 18px;border-radius:999px;border:1px solid rgba(226,232,240,.35);background:'+bg+';color:'+fg+';font-size:14px;font-weight:600;cursor:pointer;';return b;}
+      var no=mk('Ablehnen','transparent','#e2e8f0');
+      var yes=mk('Einverstanden','#e2e8f0','#0f172a');
+      no.onclick=function(){window.lvAdsConsent.deny();bar.remove();};
+      yes.onclick=function(){window.lvAdsConsent.grant();bar.remove();};
+      btns.appendChild(no);btns.appendChild(yes);
+      inner.appendChild(txt);inner.appendChild(btns);bar.appendChild(inner);
+      document.body.appendChild(bar);
+    }
+    if(document.body)build();else document.addEventListener('DOMContentLoaded',build);
+  }
+  var s=stored();
+  if(s==='granted'){loadPixel();return;}
+  if(s==='denied')return;
+  var opts={};
+  try{if(window.AbortSignal&&AbortSignal.timeout)opts.signal=AbortSignal.timeout(2500);}catch(_){}
+  fetch('/cdn-cgi/trace',opts)
+    .then(function(r){return r.ok?r.text():'';})
+    .then(function(t){
+      var m=/loc=([A-Z0-9]{2})/.exec(t||'');
+      var loc=m?m[1]:'';
+      var CONSENT='AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE IS LI NO GB CH XX T1'.split(' ');
+      if(loc&&CONSENT.indexOf(loc)===-1){loadPixel();return;}
+      banner();
+    })
+    .catch(function(){banner();});
+})();
+<\/script>`;
+}
+
+// Auf /bewerben das Bewerbungsformular direkt \u00f6ffnen.
+function buildApplyModeBlock(mode) {
+  if (mode === "thanks") return "";
+  if (mode !== "apply") {
+    // Alte Anzeigen-Links mit #bewerbung auf die eigene Seite /bewerben leiten.
+    return `<script>
+(function(){try{if(/^#bewerbung(-form)?$/.test(location.hash||''))location.replace('/bewerben');}catch(_){}})();
+<\/script>`;
+  }
+  return `<script>
+(function(){
+  function open(){var m=document.getElementById('lov-apply-modal');if(m){m.classList.add('is-open');document.body.classList.add('lov-apply-open');return true;}return false;}
+  function boot(){
+    if(open())return;
+    var f=document.getElementById('bewerbung')||document.getElementById('bewerbung-form')||document.getElementById('application-form');
+    if(f&&f.scrollIntoView)f.scrollIntoView({block:'start'});
+  }
+  if(document.readyState!=='loading')boot();else document.addEventListener('DOMContentLoaded',boot);
+  document.addEventListener('click',function(e){
+    var t=e.target;if(!t)return;
+    var isClose=(t.id==='lov-apply-modal')||(t.classList&&t.classList.contains('lov-apply-close'));
+    if(isClose){e.preventDefault();e.stopImmediatePropagation();location.assign('/');}
+  },true);
+})();
+<\/script>`;
+}
+
+// "Jetzt bewerben"-CTAs auf die eigene Unterseite /bewerben umbiegen.
+function rewriteApplyLinks(html) {
+  return String(html)
+    .replace(/href=(["'])(?:\.?\/)?#bewerbung-form\1/gi, 'href="/bewerben"')
+    .replace(/href=(["'])(?:\.?\/)?#bewerbung\1/gi, 'href="/bewerben"');
+}
+
+function injectLandingConfig(html: string, row: LandingRow, mode?: string): string {
   const esc = (s: string) => String(s ?? "").replace(/[<>"']/g, (c) => ({ "<": "\\u003c", ">": "\\u003e", '"': '\\"', "'": "\\'" }[c]!));
   const rawApi = row.branding?.api_endpoint || PORTAL_API_ENDPOINT;
   const apiEndpoint = String(rawApi ?? "").trim().replace(/[.,;\s]+$/g, "");
@@ -213,6 +303,7 @@ window.FLOW_TYPE = "${esc(row.flow_type)}";
 window.SOURCE_SLUG = "${esc(row.source_slug ?? row.slug)}";
 window.LANDING_ID = "${esc(row.id ?? "")}";
 window.WHATSAPP_NUMBER = "${esc(wa)}";
+window.LANDING_PAGE_MODE = "${esc(mode || "home")}";
 
 (function(){
   // Fasttrack-Empfang: ?ref=<broker_landing_id> aus URL nach window.SOURCE_LANDING_ID übernehmen
@@ -246,7 +337,9 @@ window.WHATSAPP_NUMBER = "${esc(wa)}";
   };
 })();
 </script>`;
-  return /<\/head>/i.test(cleanHtml) ? cleanHtml.replace(/<\/head>/i, block + "</head>") : block + cleanHtml;
+  const extra = buildPixelBlock(row, mode) + buildApplyModeBlock(mode);
+  const all = block + extra;
+  return /<\/head>/i.test(cleanHtml) ? cleanHtml.replace(/<\/head>/i, all + "</head>") : all + cleanHtml;
 }
 
 function cleanEmptyMeta(html: string, branding: Record<string, any>, domain: string): string {
@@ -270,7 +363,7 @@ function versionThemeAssets(html: string): string {
     .replace(/\bsrc=["'](?:\.\/|\/)?script\.js["']/gi, `src="/script.js?v=${v}"`);
 }
 
-function renderHtml(row: LandingRow, host: string): { body: string; status: number } {
+function renderHtml(row: LandingRow, host: string, mode?: string): { body: string; status: number } {
   const theme = THEMES[row.theme_id];
   if (!theme) return { body: `Theme nicht gefunden: ${row.theme_id}`, status: 500 };
   const slots = { ...(row.slots || {}) };
@@ -281,12 +374,63 @@ function renderHtml(row: LandingRow, host: string): { body: string; status: numb
   let html = applyPlaceholders(theme.html, row.branding, slots);
   html = html.replace(/<section[^>]*id=["'](?:impressum|datenschutz)["'][\s\S]*?<\/section>\s*/gi, "");
   html = cleanEmptyMeta(html, row.branding, host);
-  html = injectLandingConfig(html, row);
+  html = rewriteApplyLinks(html);
+  html = injectLandingConfig(html, row, mode);
   html = versionThemeAssets(html);
   // Logo/Favicon-Pfade auf /assets/* zeigen lassen (wir redirecten auf Storage)
   if (row.logo_url) html = html.replace(/assets\/logo\.[a-z]+/gi, "/assets/logo");
   if (row.favicon_url) html = html.replace(/assets\/favicon\.[a-z]+/gi, "/assets/favicon");
   return { body: html, status: 200 };
+}
+
+// ── Danke-Seite (/danke): echte Unterseite nach erfolgreicher Bewerbung ──
+function renderThanks(row: LandingRow, params: URLSearchParams): string {
+  const branding = row.branding || {};
+  const primary = /^#[0-9a-fA-F]{6}$/.test(branding.primary_color || "") ? branding.primary_color : "#1d4ed8";
+  const firm = esc(branding.firmenname || "");
+  const token = String(params.get("token") || "").slice(0, 200);
+  const next = String(params.get("next") || "");
+  const safeNext = /^https?:\/\//i.test(next) ? next : "";
+  const mail = String(params.get("mail") || "").slice(0, 60);
+  const mailReason = String(params.get("mailreason") || "").slice(0, 200);
+  const partner = String(params.get("partner") || "").slice(0, 160);
+  const logo = row.logo_url ? `<img src="/assets/logo" alt="${firm}" style="max-height:44px;width:auto;">` : `<span style="font-weight:800;font-size:19px;color:#0f172a;">${firm}</span>`;
+  const bookingHtml = token
+    ? `<div id="booking-inline-host" data-token="${esc(token)}" data-mail="${esc(mail)}" data-mail-reason="${esc(mailReason)}" style="margin-top:28px;"></div>
+       ${safeNext ? `<noscript><a class="lv-thanks-btn" href="${esc(safeNext)}">Termin buchen</a></noscript>
+       <div id="booking-fallback" style="margin-top:18px;display:none;"><a class="lv-thanks-btn" href="${esc(safeNext)}">Termin buchen</a></div>
+       <script>setTimeout(function(){var h=document.getElementById('booking-inline-host');var f=document.getElementById('booking-fallback');if(f&&h&&!h.children.length)f.style.display='block';},2500);<\/script>` : ""}`
+    : (safeNext ? `<a class="lv-thanks-btn" href="${esc(safeNext)}">Jetzt weiter zum n\u00e4chsten Schritt</a>` : "");
+  const partnerLine = partner ? `<p style="color:#475569;">Ihre Bewerbung wurde an <strong>${esc(partner)}</strong> weitergeleitet.</p>` : "";
+  const head = `<!doctype html><html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vielen Dank f\u00fcr Ihre Bewerbung${firm ? " \u2014 " + firm : ""}</title>
+<meta name="robots" content="noindex">
+${row.favicon_url ? '<link rel="icon" href="/assets/favicon">' : ""}
+<link rel="stylesheet" href="/style.css">
+<style>
+ body{margin:0;background:#f8fafc;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#0f172a;}
+ .lv-thanks-head{background:#fff;border-bottom:1px solid #e2e8f0;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+ .lv-thanks-wrap{max-width:820px;margin:0 auto;padding:48px 20px 72px;}
+ .lv-thanks-card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:36px 28px;box-shadow:0 18px 50px rgba(15,23,42,.06);}
+ .lv-thanks-card h1{font-size:30px;line-height:1.2;margin:0 0 12px;}
+ .lv-thanks-card p{font-size:16px;line-height:1.7;color:#475569;margin:0 0 12px;}
+ .lv-thanks-btn{display:inline-block;margin-top:18px;background:${primary};color:#fff;text-decoration:none;font-weight:700;padding:14px 26px;border-radius:999px;}
+ .lv-thanks-foot{text-align:center;padding:26px 20px 40px;font-size:13px;color:#64748b;}
+ .lv-thanks-foot a{color:#475569;}
+</style></head><body>`;
+  const body = `<header class="lv-thanks-head">${logo}<a href="/" style="color:#475569;text-decoration:none;font-size:14px;">Zur\u00fcck zur Startseite</a></header>
+<main class="lv-thanks-wrap"><div class="lv-thanks-card">
+  <div style="width:56px;height:56px;border-radius:50%;background:#dcfce7;color:#16a34a;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;margin-bottom:18px;">\u2713</div>
+  <h1>Vielen Dank f\u00fcr Ihre Bewerbung!</h1>
+  <p>Ihre Angaben sind bei uns eingegangen. Sie erhalten in K\u00fcrze eine Best\u00e4tigung per E-Mail \u2014 bitte pr\u00fcfen Sie auch Ihren Spam-Ordner.</p>
+  ${partnerLine}
+  ${token ? `<p><strong>Letzter Schritt:</strong> W\u00e4hlen Sie unten Ihren Wunschtermin f\u00fcr das Kennenlerngespr\u00e4ch.</p>` : ""}
+  ${bookingHtml}
+</div></main>
+<div class="lv-thanks-foot">${firm ? esc(firm) + " \u00b7 " : ""}<a href="/impressum.html">Impressum</a> \u00b7 <a href="/datenschutz.html">Datenschutz</a></div>
+<script src="/script.js"><\/script></body></html>`;
+  return injectLandingConfig(head + body, row, "thanks");
 }
 
 function renderLegal(row: LandingRow, type: "impressum" | "datenschutz"): string {
@@ -479,6 +623,13 @@ const server = Bun.serve({
     if (path === "/" || path === "/index.html") {
       const { body, status } = renderHtml(row, host);
       return new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
+    }
+    if (path === "/bewerben" || path === "/bewerben.html") {
+      const { body, status } = renderHtml(row, host, "apply");
+      return new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
+    }
+    if (path === "/danke" || path === "/danke.html") {
+      return new Response(renderThanks(row, url.searchParams), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
     }
     if (path === "/impressum" || path === "/impressum.html") {
       return new Response(renderLegal(row, "impressum"), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
