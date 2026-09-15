@@ -426,7 +426,7 @@ ${row.favicon_url ? '<link rel="icon" href="/assets/favicon">' : ""}
   <h1>Vielen Dank f\u00fcr Ihre Bewerbung!</h1>
   <p>Ihre Angaben sind bei uns eingegangen. Sie erhalten in K\u00fcrze eine Best\u00e4tigung per E-Mail \u2014 bitte pr\u00fcfen Sie auch Ihren Spam-Ordner.</p>
   ${partnerLine}
-  ${token ? `<p><strong>Letzter Schritt:</strong> W\u00e4hlen Sie unten Ihren Wunschtermin f\u00fcr das Kennenlerngespr\u00e4ch.</p>` : ""}
+  ${token || safeNext ? `<p><strong>Letzter Schritt:</strong> W\u00e4hlen Sie jetzt Ihren Wunschtermin f\u00fcr das Kennenlerngespr\u00e4ch.</p>` : ""}
   ${bookingHtml}
 </div></main>
 <div class="lv-thanks-foot">${firm ? esc(firm) + " \u00b7 " : ""}<a href="/impressum.html">Impressum</a> \u00b7 <a href="/datenschutz.html">Datenschutz</a></div>
