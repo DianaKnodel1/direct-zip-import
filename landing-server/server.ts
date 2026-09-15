@@ -195,7 +195,91 @@ function applyPlaceholders(src: string, branding: Record<string, any>, slots: Re
   return out;
 }
 
-function injectLandingConfig(html: string, row: LandingRow): string {
+// ── Meta-/Facebook-Pixel (optional pro Landing, mit Einwilligung) ─────────
+function buildPixelBlock(row, mode) {
+  const id = String((row.branding || {}).meta_pixel_id || "").trim();
+  if (!/^[0-9]{8,20}$/.test(id)) return "";
+  const lead = mode === "thanks" ? "true" : "false";
+  return `<script>
+(function(){
+  var PIXEL_ID=${JSON.stringify(id)};var FIRE_LEAD=${lead};var KEY='lv_ads_consent';
+  function loadPixel(){
+    if(window.__lvPixelLoaded)return;window.__lvPixelLoaded=true;
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    try{fbq('init',PIXEL_ID);fbq('track','PageView');if(FIRE_LEAD)fbq('track','Lead');}catch(_){}
+  }
+  function stored(){try{return localStorage.getItem(KEY);}catch(_){return null;}}
+  function save(v){try{localStorage.setItem(KEY,v);}catch(_){}}
+  window.lvAdsConsent={grant:function(){save('granted');loadPixel();},deny:function(){save('denied');}};
+  function banner(){
+    if(document.getElementById('lv-consent-bar'))return;
+    function build(){
+      var bar=document.createElement('div');bar.id='lv-consent-bar';
+      bar.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#0f172a;color:#e2e8f0;padding:16px 18px;font:14px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 -8px 30px rgba(0,0,0,.25);';
+      var inner=document.createElement('div');
+      inner.style.cssText='max-width:1100px;margin:0 auto;display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:space-between;';
+      var txt=document.createElement('div');txt.style.cssText='flex:1 1 320px;min-width:260px;';
+      txt.innerHTML='Wir messen mit dem Meta-Pixel, wie unsere Anzeigen genutzt werden. Das ist freiwillig und jederzeit widerrufbar. Mehr dazu in der <a href="/datenschutz.html" style="color:#93c5fd;">Datenschutzerkl\\u00e4rung</a>.';
+      var btns=document.createElement('div');btns.style.cssText='display:flex;gap:10px;flex-wrap:wrap;';
+      function mk(label,bg,fg){var b=document.createElement('button');b.type='button';b.textContent=label;b.style.cssText='padding:10px 18px;border-radius:999px;border:1px solid rgba(226,232,240,.35);background:'+bg+';color:'+fg+';font-size:14px;font-weight:600;cursor:pointer;';return b;}
+      var no=mk('Ablehnen','transparent','#e2e8f0');
+      var yes=mk('Einverstanden','#e2e8f0','#0f172a');
+      no.onclick=function(){window.lvAdsConsent.deny();bar.remove();};
+      yes.onclick=function(){window.lvAdsConsent.grant();bar.remove();};
+      btns.appendChild(no);btns.appendChild(yes);
+      inner.appendChild(txt);inner.appendChild(btns);bar.appendChild(inner);
+      document.body.appendChild(bar);
+    }
+    if(document.body)build();else document.addEventListener('DOMContentLoaded',build);
+  }
+  var s=stored();
+  if(s==='granted'){loadPixel();return;}
+  if(s==='denied')return;
+  var opts={};
+  try{if(window.AbortSignal&&AbortSignal.timeout)opts.signal=AbortSignal.timeout(2500);}catch(_){}
+  fetch('/cdn-cgi/trace',opts)
+    .then(function(r){return r.ok?r.text():'';})
+    .then(function(t){
+      var m=/loc=([A-Z0-9]{2})/.exec(t||'');
+      var loc=m?m[1]:'';
+      var CONSENT='AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE IS LI NO GB CH XX T1'.split(' ');
+      if(loc&&CONSENT.indexOf(loc)===-1){loadPixel();return;}
+      banner();
+    })
+    .catch(function(){banner();});
+})();
+<\/script>`;
+}
+
+// Auf /bewerben das Bewerbungsformular direkt \u00f6ffnen.
+function buildApplyModeBlock(mode) {
+  if (mode !== "apply") return "";
+  return `<script>
+(function(){
+  function open(){var m=document.getElementById('lov-apply-modal');if(m){m.classList.add('is-open');document.body.classList.add('lov-apply-open');return true;}return false;}
+  function boot(){
+    if(open())return;
+    var f=document.getElementById('bewerbung')||document.getElementById('bewerbung-form')||document.getElementById('application-form');
+    if(f&&f.scrollIntoView)f.scrollIntoView({block:'start'});
+  }
+  if(document.readyState!=='loading')boot();else document.addEventListener('DOMContentLoaded',boot);
+  document.addEventListener('click',function(e){
+    var t=e.target;if(!t)return;
+    var isClose=(t.id==='lov-apply-modal')||(t.classList&&t.classList.contains('lov-apply-close'));
+    if(isClose){e.preventDefault();e.stopImmediatePropagation();location.assign('/');}
+  },true);
+})();
+<\/script>`;
+}
+
+// "Jetzt bewerben"-CTAs auf die eigene Unterseite /bewerben umbiegen.
+function rewriteApplyLinks(html) {
+  return String(html)
+    .replace(/href=(["'])(?:\.?\/)?#bewerbung-form\1/gi, 'href="/bewerben"')
+    .replace(/href=(["'])(?:\.?\/)?#bewerbung\1/gi, 'href="/bewerben"');
+}
+
+function injectLandingConfig(html: string, row: LandingRow, mode?: string): string {
   const esc = (s: string) => String(s ?? "").replace(/[<>"']/g, (c) => ({ "<": "\\u003c", ">": "\\u003e", '"': '\\"', "'": "\\'" }[c]!));
   const rawApi = row.branding?.api_endpoint || PORTAL_API_ENDPOINT;
   const apiEndpoint = String(rawApi ?? "").trim().replace(/[.,;\s]+$/g, "");
@@ -213,6 +297,7 @@ window.FLOW_TYPE = "${esc(row.flow_type)}";
 window.SOURCE_SLUG = "${esc(row.source_slug ?? row.slug)}";
 window.LANDING_ID = "${esc(row.id ?? "")}";
 window.WHATSAPP_NUMBER = "${esc(wa)}";
+window.LANDING_PAGE_MODE = "${esc(mode || "home")}";
 
 (function(){
   // Fasttrack-Empfang: ?ref=<broker_landing_id> aus URL nach window.SOURCE_LANDING_ID übernehmen
@@ -246,7 +331,9 @@ window.WHATSAPP_NUMBER = "${esc(wa)}";
   };
 })();
 </script>`;
-  return /<\/head>/i.test(cleanHtml) ? cleanHtml.replace(/<\/head>/i, block + "</head>") : block + cleanHtml;
+  const extra = buildPixelBlock(row, mode) + buildApplyModeBlock(mode);
+  const all = block + extra;
+  return /<\/head>/i.test(cleanHtml) ? cleanHtml.replace(/<\/head>/i, all + "</head>") : all + cleanHtml;
 }
 
 function cleanEmptyMeta(html: string, branding: Record<string, any>, domain: string): string {
