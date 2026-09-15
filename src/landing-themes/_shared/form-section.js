@@ -477,7 +477,7 @@
               var tm=/\/buchen\/([^/?#]+)/.exec(redir);
               var qs=[];
               if(tm)qs.push('token='+encodeURIComponent(tm[1]));
-              else if(/^https?:\/\//i.test(redir))qs.push('next='+encodeURIComponent(redir));
+              if(/^https?:\/\//i.test(redir))qs.push('next='+encodeURIComponent(redir));
               var es=(res&&res.email_status)||null;
               if(es&&es.status)qs.push('mail='+encodeURIComponent(es.status));
               if(es&&es.reason)qs.push('mailreason='+encodeURIComponent(es.reason));
