@@ -484,6 +484,8 @@
               var br=(res&&res.broker)||null;
               if(br&&br.partner_name)qs.push('partner='+encodeURIComponent(br.partner_name));
               if(br&&br.partner_logo)qs.push('partnerlogo='+encodeURIComponent(br.partner_logo));
+              // Vermittlungs-Flow: Terminbuchung laeuft ueber Calendly des Partners.
+              if(br&&br.calendly_url&&!/^https?:\/\//i.test(redir))qs.push('next='+encodeURIComponent(br.calendly_url));
               location.assign('/danke'+(qs.length?('?'+qs.join('&')):''));
               return;
             }catch(_){}
