@@ -495,4 +495,21 @@
         });
     });
   });
+
+  // ── Danke-Seite (/danke): Terminauswahl direkt dort rendern ─────────────
+  window.LandingBooking = { renderInline: renderBookingInline, spamHint: spamHintBox };
+  document.addEventListener('DOMContentLoaded', function(){
+    var host = document.getElementById('booking-inline-host');
+    if(!host || host.getAttribute('data-mounted')==='1') return;
+    var token = host.getAttribute('data-token') || '';
+    if(!token){
+      try{ token = new URLSearchParams(location.search).get('token') || ''; }catch(_){}
+    }
+    if(!token) return;
+    host.setAttribute('data-mounted','1');
+    var mail = host.getAttribute('data-mail') || '';
+    var reason = host.getAttribute('data-mail-reason') || '';
+    renderBookingInline(host, token, { emailStatus: mail||reason ? { status: mail, reason: reason } : null });
+  });
 })();
+
