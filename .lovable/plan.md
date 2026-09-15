@@ -43,8 +43,11 @@ Der Landing-Server holt neue Theme-Dateien nur, wenn genau diese Markierung gese
   `src/landing-themes/_shared/form-section.js` (`location.assign('/danke…')`)
   und wird in die Theme-Datei `script.js` gebaut — deshalb ist der Theme-Abgleich
   der entscheidende Schritt.
-- Am Code muss dafür nichts geändert werden; `/danke` und `/bewerben` sind im
-  Renderer bereits vorhanden und live erreichbar.
+- Einzige Codeänderung: In `form-section.js` (Zeile ~308) wird die Beschriftung
+  `'Jetzt bewerben  →'` zu `'Jetzt Termin vereinbaren  →'`; `/danke` und
+  `/bewerben` sind im Renderer bereits vorhanden und live erreichbar.
+- Danach `scripts/build-theme-assets.mjs` über den Deploy, damit die neue
+  Beschriftung in alle Theme-Skripte wandert.
 
 ## Danach für Facebook
 
