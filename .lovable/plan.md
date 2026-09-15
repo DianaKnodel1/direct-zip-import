@@ -17,14 +17,18 @@ Der Landing-Server holt neue Theme-Dateien nur, wenn genau diese Markierung gese
 
 ## Was gemacht wird
 
-1. **Theme-Abgleich anstoßen** — entweder über die Infrastruktur-Seite im Portal
+1. **Beschriftung korrigieren:** Die grüne Schaltfläche nach dem Absenden heißt
+   künftig **„Jetzt Termin vereinbaren →"** statt „Jetzt bewerben →" — auf allen
+   Landing Pages. Auch der begleitende Text wird auf die Terminauswahl bezogen.
+2. **Theme-Abgleich anstoßen** — entweder über die Infrastruktur-Seite im Portal
    (Landing-Server → Themes neu synchronisieren) oder direkt auf dem Landing-Server.
    Danach lädt der Server Formular-Skript, Vorlagen und Bilder neu und startet sich neu.
-2. **Zwischenspeicher leeren** und Dienste neu starten, damit die alten Seiten
+3. **Zwischenspeicher leeren** und Dienste neu starten, damit die alten Seiten
    nicht weiter ausgeliefert werden.
-3. **Prüfen:** Testbewerbung über `/bewerben` abschicken → es muss auf
-   `/danke` landen, dort erscheint der Danke-Text und die Terminauswahl.
-4. **Dauerhaft absichern:** `TARGET_DB_URL` in `/opt/apps/portal/.env.server`
+4. **Prüfen:** Testbewerbung über `/bewerben` abschicken → die Adresse muss auf
+   `/danke` wechseln, dort erscheint der Danke-Text und die Terminauswahl mit der
+   neuen Beschriftung.
+5. **Dauerhaft absichern:** `TARGET_DB_URL` in `/opt/apps/portal/.env.server`
    eintragen, damit künftige Deploys den Theme-Abgleich automatisch auslösen
    und dieser Zwischenschritt entfällt.
 
@@ -39,8 +43,11 @@ Der Landing-Server holt neue Theme-Dateien nur, wenn genau diese Markierung gese
   `src/landing-themes/_shared/form-section.js` (`location.assign('/danke…')`)
   und wird in die Theme-Datei `script.js` gebaut — deshalb ist der Theme-Abgleich
   der entscheidende Schritt.
-- Am Code muss dafür nichts geändert werden; `/danke` und `/bewerben` sind im
-  Renderer bereits vorhanden und live erreichbar.
+- Einzige Codeänderung: In `form-section.js` (Zeile ~308) wird die Beschriftung
+  `'Jetzt bewerben  →'` zu `'Jetzt Termin vereinbaren  →'`; `/danke` und
+  `/bewerben` sind im Renderer bereits vorhanden und live erreichbar.
+- Danach `scripts/build-theme-assets.mjs` über den Deploy, damit die neue
+  Beschriftung in alle Theme-Skripte wandert.
 
 ## Danach für Facebook
 
