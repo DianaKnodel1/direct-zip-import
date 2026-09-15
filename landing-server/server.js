@@ -393,7 +393,13 @@ function buildPixelBlock(row, mode) {
 
 // Auf /bewerben das Bewerbungsformular direkt \u00f6ffnen.
 function buildApplyModeBlock(mode) {
-  if (mode !== "apply") return "";
+  if (mode === "thanks") return "";
+  if (mode !== "apply") {
+    // Alte Anzeigen-Links mit #bewerbung auf die eigene Seite /bewerben leiten.
+    return `<script>
+(function(){try{if(/^#bewerbung(-form)?$/.test(location.hash||''))location.replace('/bewerben');}catch(_){}})();
+<\/script>`;
+  }
   return `<script>
 (function(){
   function open(){var m=document.getElementById('lov-apply-modal');if(m){m.classList.add('is-open');document.body.classList.add('lov-apply-open');return true;}return false;}
