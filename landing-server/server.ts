@@ -357,7 +357,7 @@ function versionThemeAssets(html: string): string {
     .replace(/\bsrc=["'](?:\.\/|\/)?script\.js["']/gi, `src="/script.js?v=${v}"`);
 }
 
-function renderHtml(row: LandingRow, host: string): { body: string; status: number } {
+function renderHtml(row: LandingRow, host: string, mode?: string): { body: string; status: number } {
   const theme = THEMES[row.theme_id];
   if (!theme) return { body: `Theme nicht gefunden: ${row.theme_id}`, status: 500 };
   const slots = { ...(row.slots || {}) };
@@ -368,12 +368,63 @@ function renderHtml(row: LandingRow, host: string): { body: string; status: numb
   let html = applyPlaceholders(theme.html, row.branding, slots);
   html = html.replace(/<section[^>]*id=["'](?:impressum|datenschutz)["'][\s\S]*?<\/section>\s*/gi, "");
   html = cleanEmptyMeta(html, row.branding, host);
-  html = injectLandingConfig(html, row);
+  html = rewriteApplyLinks(html);
+  html = injectLandingConfig(html, row, mode);
   html = versionThemeAssets(html);
   // Logo/Favicon-Pfade auf /assets/* zeigen lassen (wir redirecten auf Storage)
   if (row.logo_url) html = html.replace(/assets\/logo\.[a-z]+/gi, "/assets/logo");
   if (row.favicon_url) html = html.replace(/assets\/favicon\.[a-z]+/gi, "/assets/favicon");
   return { body: html, status: 200 };
+}
+
+// ── Danke-Seite (/danke): echte Unterseite nach erfolgreicher Bewerbung ──
+function renderThanks(row: LandingRow, params: URLSearchParams): string {
+  const branding = row.branding || {};
+  const primary = /^#[0-9a-fA-F]{6}$/.test(branding.primary_color || "") ? branding.primary_color : "#1d4ed8";
+  const firm = esc(branding.firmenname || "");
+  const token = String(params.get("token") || "").slice(0, 200);
+  const next = String(params.get("next") || "");
+  const safeNext = /^https?:\/\//i.test(next) ? next : "";
+  const mail = String(params.get("mail") || "").slice(0, 60);
+  const mailReason = String(params.get("mailreason") || "").slice(0, 200);
+  const partner = String(params.get("partner") || "").slice(0, 160);
+  const logo = row.logo_url ? `<img src="/assets/logo" alt="${firm}" style="max-height:44px;width:auto;">` : `<span style="font-weight:800;font-size:19px;color:#0f172a;">${firm}</span>`;
+  const bookingHtml = token
+    ? `<div id="booking-inline-host" data-token="${esc(token)}" data-mail="${esc(mail)}" data-mail-reason="${esc(mailReason)}" style="margin-top:28px;"></div>
+       ${safeNext ? `<noscript><a class="lv-thanks-btn" href="${esc(safeNext)}">Termin buchen</a></noscript>
+       <div id="booking-fallback" style="margin-top:18px;display:none;"><a class="lv-thanks-btn" href="${esc(safeNext)}">Termin buchen</a></div>
+       <script>setTimeout(function(){var h=document.getElementById('booking-inline-host');var f=document.getElementById('booking-fallback');if(f&&h&&!h.children.length)f.style.display='block';},2500);<\/script>` : ""}`
+    : (safeNext ? `<a class="lv-thanks-btn" href="${esc(safeNext)}">Jetzt weiter zum n\u00e4chsten Schritt</a>` : "");
+  const partnerLine = partner ? `<p style="color:#475569;">Ihre Bewerbung wurde an <strong>${esc(partner)}</strong> weitergeleitet.</p>` : "";
+  const head = `<!doctype html><html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vielen Dank f\u00fcr Ihre Bewerbung${firm ? " \u2014 " + firm : ""}</title>
+<meta name="robots" content="noindex">
+${row.favicon_url ? '<link rel="icon" href="/assets/favicon">' : ""}
+<link rel="stylesheet" href="/style.css">
+<style>
+ body{margin:0;background:#f8fafc;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#0f172a;}
+ .lv-thanks-head{background:#fff;border-bottom:1px solid #e2e8f0;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+ .lv-thanks-wrap{max-width:820px;margin:0 auto;padding:48px 20px 72px;}
+ .lv-thanks-card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:36px 28px;box-shadow:0 18px 50px rgba(15,23,42,.06);}
+ .lv-thanks-card h1{font-size:30px;line-height:1.2;margin:0 0 12px;}
+ .lv-thanks-card p{font-size:16px;line-height:1.7;color:#475569;margin:0 0 12px;}
+ .lv-thanks-btn{display:inline-block;margin-top:18px;background:${primary};color:#fff;text-decoration:none;font-weight:700;padding:14px 26px;border-radius:999px;}
+ .lv-thanks-foot{text-align:center;padding:26px 20px 40px;font-size:13px;color:#64748b;}
+ .lv-thanks-foot a{color:#475569;}
+</style></head><body>`;
+  const body = `<header class="lv-thanks-head">${logo}<a href="/" style="color:#475569;text-decoration:none;font-size:14px;">Zur\u00fcck zur Startseite</a></header>
+<main class="lv-thanks-wrap"><div class="lv-thanks-card">
+  <div style="width:56px;height:56px;border-radius:50%;background:#dcfce7;color:#16a34a;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;margin-bottom:18px;">\u2713</div>
+  <h1>Vielen Dank f\u00fcr Ihre Bewerbung!</h1>
+  <p>Ihre Angaben sind bei uns eingegangen. Sie erhalten in K\u00fcrze eine Best\u00e4tigung per E-Mail \u2014 bitte pr\u00fcfen Sie auch Ihren Spam-Ordner.</p>
+  ${partnerLine}
+  ${token ? `<p><strong>Letzter Schritt:</strong> W\u00e4hlen Sie unten Ihren Wunschtermin f\u00fcr das Kennenlerngespr\u00e4ch.</p>` : ""}
+  ${bookingHtml}
+</div></main>
+<div class="lv-thanks-foot">${firm ? esc(firm) + " \u00b7 " : ""}<a href="/impressum.html">Impressum</a> \u00b7 <a href="/datenschutz.html">Datenschutz</a></div>
+<script src="/script.js"><\/script></body></html>`;
+  return injectLandingConfig(head + body, row, "thanks");
 }
 
 function renderLegal(row: LandingRow, type: "impressum" | "datenschutz"): string {
