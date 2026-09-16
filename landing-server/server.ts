@@ -196,12 +196,13 @@ function applyPlaceholders(src: string, branding: Record<string, any>, slots: Re
 }
 
 // ── Meta-/Facebook-Pixel (optional pro Landing, mit Einwilligung) ─────────
-function buildPixelBlock(row, mode) {
+function buildPixelBlock(row, mode, leadFired?: boolean) {
   const branding = row.branding || {};
   const custom = String(branding.meta_pixel_code || "").trim();
   const id = String(branding.meta_pixel_id || "").trim();
   if (!custom && !/^[0-9]{8,20}$/.test(id)) return "";
-  const lead = mode === "thanks" ? "true" : "false";
+  // Lead auf /danke nur feuern, wenn es nicht schon beim Absenden gesendet wurde (lead=1).
+  const lead = mode === "thanks" && !leadFired ? "true" : "false";
   // Eigener Code: unveraendert einbetten, aber "</" maskieren, damit das
   // umschliessende <script>-Tag nicht vorzeitig endet.
   const customJson = custom ? JSON.stringify(custom).replace(/<\//g, "<\\/") : "null";

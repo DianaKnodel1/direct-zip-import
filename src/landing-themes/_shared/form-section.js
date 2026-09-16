@@ -486,6 +486,12 @@
               if(br&&br.partner_logo)qs.push('partnerlogo='+encodeURIComponent(br.partner_logo));
               // Vermittlungs-Flow: Terminbuchung laeuft ueber Calendly des Partners.
               if(br&&br.calendly_url&&!/^https?:\/\//i.test(redir))qs.push('next='+encodeURIComponent(br.calendly_url));
+              // Meta-Pixel: Lead direkt beim Absenden feuern (Fast-geschafft-Moment),
+              // damit die Conversion auch ohne Weiterleitung zaehlt. lead=1 verhindert
+              // ein zweites Lead auf /danke.
+              var leadFired=false;
+              try{if(typeof window.fbq==='function'){window.fbq('track','Lead');leadFired=true;}}catch(_){}
+              if(leadFired)qs.push('lead=1');
               location.assign('/danke'+(qs.length?('?'+qs.join('&')):''));
               return;
             }catch(_){}
