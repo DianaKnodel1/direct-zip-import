@@ -21,6 +21,7 @@ const CACHE_TTL_MS = 60_000;
 // Ein echtes "Domain steht nicht in der Tabelle" nur kurz merken, damit eine
 // frisch angelegte Landing schnell live geht.
 const NEGATIVE_CACHE_TTL_MS = 15_000;
+const ASSET_VERSION = process.env.LANDING_ASSET_VERSION || process.env.RELEASE_VERSION || String(Date.now());
 const ASSET_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const assetCache = new Map();
 
@@ -599,6 +600,13 @@ function cleanEmptyMeta(html, branding, domain) {
 // Rechtstexte zentral aus ./legal-content.js (Mirror von src/lib/legal-content.ts).
 // Neu erzeugen mit: bun scripts/build-legal-content-js.mjs
 
+function versionThemeAssets(html) {
+  const v = encodeURIComponent(ASSET_VERSION);
+  return html
+    .replace(/\bhref=["'](?:\.\/|\/)?style\.css["']/gi, `href="/style.css?v=${v}"`)
+    .replace(/\bsrc=["'](?:\.\/|\/)?script\.js["']/gi, `src="/script.js?v=${v}"`);
+}
+
 async function renderHtml(row, host, mode) {
   const theme = await loadTheme(row.theme_id);
   if (!theme) return { body: `Theme nicht gefunden: ${row.theme_id}`, status: 500 };
@@ -620,6 +628,7 @@ async function renderHtml(row, host, mode) {
   html = injectTrustFooter(html, row.branding || {});
   html = rewriteApplyLinks(html);
   html = injectLandingConfig(html, row, mode);
+  html = versionThemeAssets(html);
 
   // Alte gespeicherte Bildpfade aus der Entwicklungsumgebung auf die
   // Theme-Assets umbiegen (sonst 404 nach einem Theme-Wechsel).
@@ -707,7 +716,7 @@ ${row.favicon_url ? '<link rel="icon" href="/assets/favicon">' : ""}
 </div></main>
 <div class="lv-thanks-foot">${firm ? esc(firm) + " \u00b7 " : ""}<a href="/impressum.html">Impressum</a> \u00b7 <a href="/datenschutz.html">Datenschutz</a></div>
 <script src="/script.js"><\/script></body></html>`;
-  return injectLandingConfig(head + body, row, "thanks");
+  return versionThemeAssets(injectLandingConfig(head + body, row, "thanks"));
 }
 
 function renderLegal(row, type) {
