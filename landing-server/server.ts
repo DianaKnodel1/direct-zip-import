@@ -431,7 +431,7 @@ ${row.favicon_url ? '<link rel="icon" href="/assets/favicon">' : ""}
 </div></main>
 <div class="lv-thanks-foot">${firm ? esc(firm) + " \u00b7 " : ""}<a href="/impressum.html">Impressum</a> \u00b7 <a href="/datenschutz.html">Datenschutz</a></div>
 <script src="/script.js"><\/script></body></html>`;
-  return injectLandingConfig(head + body, row, "thanks");
+  return versionThemeAssets(injectLandingConfig(head + body, row, "thanks"));
 }
 
 function renderLegal(row: LandingRow, type: "impressum" | "datenschutz"): string {
