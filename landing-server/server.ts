@@ -197,14 +197,37 @@ function applyPlaceholders(src: string, branding: Record<string, any>, slots: Re
 
 // ── Meta-/Facebook-Pixel (optional pro Landing, mit Einwilligung) ─────────
 function buildPixelBlock(row, mode) {
-  const id = String((row.branding || {}).meta_pixel_id || "").trim();
-  if (!/^[0-9]{8,20}$/.test(id)) return "";
+  const branding = row.branding || {};
+  const custom = String(branding.meta_pixel_code || "").trim();
+  const id = String(branding.meta_pixel_id || "").trim();
+  if (!custom && !/^[0-9]{8,20}$/.test(id)) return "";
   const lead = mode === "thanks" ? "true" : "false";
+  // Eigener Code: unveraendert einbetten, aber "</" maskieren, damit das
+  // umschliessende <script>-Tag nicht vorzeitig endet.
+  const customJson = custom ? JSON.stringify(custom).replace(/<\//g, "<\\/") : "null";
   return `<script>
 (function(){
-  var PIXEL_ID=${JSON.stringify(id)};var FIRE_LEAD=${lead};var KEY='lv_ads_consent';
+  var PIXEL_ID=${JSON.stringify(id)};var CUSTOM=${customJson};var FIRE_LEAD=${lead};var KEY='lv_ads_consent';
   function loadPixel(){
     if(window.__lvPixelLoaded)return;window.__lvPixelLoaded=true;
+    if(CUSTOM){
+      // Kompletten Pixel-Code (Admin-gepflegt) erst nach Einwilligung einfuegen.
+      var host=document.createElement('div');host.innerHTML=CUSTOM;
+      var nodes=Array.prototype.slice.call(host.childNodes);
+      for(var i=0;i<nodes.length;i++){var n=nodes[i];
+        if(n.tagName==='SCRIPT'){
+          var s=document.createElement('script');
+          for(var j=0;j<n.attributes.length;j++){var a=n.attributes[j];s.setAttribute(a.name,a.value);}
+          s.text=n.text||n.textContent||'';
+          document.head.appendChild(s);
+        }else if(n.tagName==='NOSCRIPT'){
+          var img=n.querySelector?n.querySelector('img'):null;
+          if(img){var im=document.createElement('img');im.src=img.getAttribute('src');im.width=1;im.height=1;im.style.display='none';document.body.appendChild(im);}
+        }
+      }
+      if(FIRE_LEAD){try{fbq('track','Lead');}catch(_){}}
+      return;
+    }
     !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
     try{fbq('init',PIXEL_ID);fbq('track','PageView');if(FIRE_LEAD)fbq('track','Lead');}catch(_){}
   }
