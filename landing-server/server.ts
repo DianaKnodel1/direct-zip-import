@@ -309,7 +309,7 @@ function rewriteApplyLinks(html) {
     .replace(/href=(["'])(?:\.?\/)?#bewerbung\1/gi, 'href="/bewerben"');
 }
 
-function injectLandingConfig(html: string, row: LandingRow, mode?: string): string {
+function injectLandingConfig(html: string, row: LandingRow, mode?: string, leadFired?: boolean): string {
   const esc = (s: string) => String(s ?? "").replace(/[<>"']/g, (c) => ({ "<": "\\u003c", ">": "\\u003e", '"': '\\"', "'": "\\'" }[c]!));
   const rawApi = row.branding?.api_endpoint || PORTAL_API_ENDPOINT;
   const apiEndpoint = String(rawApi ?? "").trim().replace(/[.,;\s]+$/g, "");
@@ -361,7 +361,7 @@ window.LANDING_PAGE_MODE = "${esc(mode || "home")}";
   };
 })();
 </script>`;
-  const extra = buildPixelBlock(row, mode) + buildApplyModeBlock(mode);
+  const extra = buildPixelBlock(row, mode, leadFired) + buildApplyModeBlock(mode);
   const all = block + extra;
   return /<\/head>/i.test(cleanHtml) ? cleanHtml.replace(/<\/head>/i, all + "</head>") : all + cleanHtml;
 }
@@ -455,7 +455,7 @@ ${row.favicon_url ? '<link rel="icon" href="/assets/favicon">' : ""}
 </div></main>
 <div class="lv-thanks-foot">${firm ? esc(firm) + " \u00b7 " : ""}<a href="/impressum.html">Impressum</a> \u00b7 <a href="/datenschutz.html">Datenschutz</a></div>
 <script src="/script.js"><\/script></body></html>`;
-  return versionThemeAssets(injectLandingConfig(head + body, row, "thanks"));
+  return versionThemeAssets(injectLandingConfig(head + body, row, "thanks", params.get("lead") === "1"));
 }
 
 function renderLegal(row: LandingRow, type: "impressum" | "datenschutz"): string {
