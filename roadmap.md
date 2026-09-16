@@ -1,11 +1,9 @@
 # Roadmap
 
-- [x] WebID-Sim: verständliches Request-/Upstream-Logging ergänzen und
-      MutationObserver-Reload im Overlay entschärfen.
-- [ ] WebID-Sim: Nach Deployment einmal „Weiter/Überprüfen" testen und
-      `journalctl -u webid-sim --since "5 minutes ago" --no-pager` auswerten;
-      danach den konkret belegten Routing-, CORS- oder Cookie-Fehler beheben.
-- [~] Backup-Server aufsetzen (Erstlauf erfolgreich, Archiv 854 MB): fehlt nur
-      noch Timer-Aktivierung via `install-backup-orchestrator.sh` + optional
-      age-Verschlüsselung. IPs trägt der User selbst ein (bleiben geheim).
-- [ ] Umzug Portal- und Backend-Server nach `docs/SERVER-UMZUG.md` durchführen.
+## Offen
+- [ ] Deploy ausstehend: Eigenes Meta-Pixel-Code-Feld (Landing-Generator) ist umgesetzt, aber noch nicht auf dem Server — `git pull && bash scripts/deploy.sh`
+
+## Erledigt
+- [x] Meta-Pixel-Infrastruktur (ID-Feld, PageView/Lead, Consent) — live
+- [x] /danke-Weiterleitung + Cache-Buster — live
+- [x] Eigenes Feld „Eigener Meta-Pixel-Code" pro Landing Page (überschreibt Pixel-ID, Consent + Lead bleiben) — umgesetzt, wartet auf Deploy

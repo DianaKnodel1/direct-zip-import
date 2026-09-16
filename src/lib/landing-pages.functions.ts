@@ -34,6 +34,8 @@ const BrandingSchema = z.object({
   portal_url: z.string().max(500).default(""),
   // Meta-/Facebook-Pixel (optional, pro Landing Page)
   meta_pixel_id: z.string().max(40).default(""),
+  // Optional: kompletter Pixel-Code (überschreibt meta_pixel_id)
+  meta_pixel_code: z.string().max(10_000).default(""),
   tenant_id: z.string().max(120).default(""),
   seo_title: z.string().max(320).default(""),
   seo_description: z.string().max(640).default(""),

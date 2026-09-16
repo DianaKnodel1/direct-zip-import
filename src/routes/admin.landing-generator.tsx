@@ -79,6 +79,7 @@ type Branding = {
   api_endpoint: string;
   portal_url: string;
   meta_pixel_id: string;
+  meta_pixel_code: string;
   portal_theme: PortalThemeId;
 
   supabase_url: string;
@@ -127,6 +128,7 @@ const EMPTY: Branding = {
   api_endpoint: "",
   portal_url: "",
   meta_pixel_id: "",
+  meta_pixel_code: "",
   portal_theme: "clean",
 
   supabase_url: "",
@@ -716,6 +718,7 @@ document.addEventListener('submit', function(e){
           geschaeftsfuehrer: b.geschaeftsfuehrer, impressum: b.impressum,
           api_endpoint: b.api_endpoint, portal_url: b.portal_url, tenant_id: b.tenant_id,
           meta_pixel_id: (b.meta_pixel_id || "").trim(),
+          meta_pixel_code: (b.meta_pixel_code || "").trim(),
           portal_theme: b.portal_theme || "clean",
 
           seo_title: b.seo_title, seo_description: b.seo_description, seo_image: b.seo_image,
@@ -1248,6 +1251,18 @@ document.addEventListener('submit', function(e){
                   <p className="text-[10px] text-muted-foreground mt-1">
                     Leer = kein Pixel, kein Cookie-Hinweis. Gefüllt: Das Pixel lädt auf allen Seiten der Landing Page und meldet auf <code>/danke</code> das Ereignis <code>Lead</code>.
                     In Europa erscheint vorher ein schlanker Einwilligungs-Hinweis; erst nach „Einverstanden“ lädt das Pixel.
+                  </p>
+                </Field>
+                <Field label="Eigener Meta-Pixel-Code (komplett, optional)">
+                  <Textarea
+                    rows={6}
+                    value={branding.meta_pixel_code}
+                    onChange={set("meta_pixel_code")}
+                    placeholder="<!-- Meta Pixel Code --> … kompletten Code vom Werbeberater hier reinkopieren …"
+                    className="font-mono text-xs"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Gefüllt: Dieser Code wird 1:1 eingebunden und <strong>überschreibt die Pixel-ID oben</strong>. Das Ereignis <code>Lead</code> auf <code>/danke</code> und der Einwilligungs-Hinweis bleiben automatisch erhalten. Leer = es gilt die Pixel-ID.
                   </p>
                 </Field>
                 <Field label="API-Endpoint für Bewerbungen *">
