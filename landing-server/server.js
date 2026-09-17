@@ -180,7 +180,8 @@ async function loadTheme(id) {
         console.warn(`[themes] portal fetch failed ${safeId}/${fname}: ${e?.message || e}`);
       }
     }
-    out[k] = content;
+    // Portal nicht erreichbar → lieber die unvollständige lokale Fassung als gar nichts.
+    out[k] = content || localContent;
   }
   if (!out.html) {
     themeCache.set(safeId, { ts: Date.now(), theme: null });
