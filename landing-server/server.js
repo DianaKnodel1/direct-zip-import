@@ -159,11 +159,15 @@ async function loadTheme(id) {
       }
     } catch (_) { content = ""; }
     // Selbstheilung: Rohvorlagen ohne Bewerbungsformular gelten als unbrauchbar —
-    // template.html/script.js müssen den Formularteil enthalten.
+    // template.html/script.js müssen den Formularteil enthalten, style.css die
+    // Formular-/Fenster-Stile (sonst wird das Formular unformatiert angezeigt).
     const needsForm = fname === "template.html" || fname === "script.js";
-    const broken = needsForm && content && !content.includes("application-form");
+    const localContent = content;
+    const cssIncomplete =
+      fname === "style.css" && !!content && !content.includes("lov-apply-modal") && !/lv-form-section|-form-section\b/.test(content);
+    const broken = (needsForm && content && !content.includes("application-form")) || cssIncomplete;
     if (broken) {
-      console.warn(`[themes] ${safeId}/${fname} ohne Bewerbungsformular — lade vom Portal nach`);
+      console.warn(`[themes] ${safeId}/${fname} unvollständig (Rohvorlage) — lade vom Portal nach`);
       content = "";
     }
     // Fallback: fehlt/leer lokal → vom Portal nachladen (identische Quelle wie Heartbeat-Resync).
