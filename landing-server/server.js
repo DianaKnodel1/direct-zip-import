@@ -906,6 +906,9 @@ const APPLY_MODAL_CSS = `
 #lov-apply-modal .lov-apply-body>section{padding-top:32px;padding-bottom:32px}
 body.lov-apply-open{overflow:hidden}
 @media(max-width:640px){#lov-apply-modal{padding:12px 8px}#lov-apply-modal .lov-apply-body{max-height:calc(100vh - 24px)}}
+/* Auf /bewerben wird das Formular als normaler Seitenabschnitt ausgeliefert. */
+#lov-apply-inline{display:block;width:100%}
+#lov-apply-inline>section{padding-top:48px;padding-bottom:48px}
 `;
 
 function renderCss(row) {
