@@ -701,6 +701,7 @@ async function renderHtml(row, host, mode) {
   let html = applyPlaceholders(theme.html, row.branding, slots);
   html = html.replace(/<section[^>]*id=["'](?:impressum|datenschutz)["'][\s\S]*?<\/section>\s*/gi, "");
   html = cleanEmptyMeta(html, row.branding, host);
+  if (mode === "apply") html = unwrapApplyModal(html);
   html = injectTrustFooter(html, row.branding || {});
   html = rewriteApplyLinks(html);
   html = injectLandingConfig(html, row, mode);
