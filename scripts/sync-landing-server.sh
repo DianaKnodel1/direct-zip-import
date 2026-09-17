@@ -72,19 +72,64 @@ ok "Core-Dateien übertragen"
 # Themes immer direkt übertragen. Ohne TARGET_DB_URL kann das Resync-Flag nicht
 # gesetzt werden; früher blieb dadurch trotz erfolgreichem Deploy eine alte
 # script.js auf dem Landing-Server liegen.
+#
+# WICHTIG: Die Rohdateien unter src/landing-themes/ enthalten NICHT das
+# Bewerbungsformular. Template/CSS/JS werden erst im Portal zusammengebaut
+# (withSharedForm) und über den Files-Endpunkt ausgeliefert. Wir laden daher
+# exakt diese fertigen Dateien und übertragen sie; die Assets kommen weiterhin
+# direkt aus dem Repo.
 if [ ! -d "$PROJECT_DIR/src/landing-themes" ]; then
   warn "Theme-Verzeichnis fehlt: $PROJECT_DIR/src/landing-themes — Sync abgebrochen"
   exit 1
 fi
 
-rsync -avz --checksum --delete --no-perms \
-  "$PROJECT_DIR/src/landing-themes/" \
-  "$REMOTE:$REMOTE_DIR/themes/"
+FILES_BASE="${LANDING_FILES_BASE:-$(env_file_value LANDING_FILES_BASE)}"
+if [ -z "$FILES_BASE" ]; then
+  HB_URL=$(ssh -o ConnectTimeout=10 -o BatchMode=yes "$REMOTE" \
+    "grep -E '^HEARTBEAT_URL=' $REMOTE_DIR/.env 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '\"'" || true)
+  [ -n "$HB_URL" ] && FILES_BASE="${HB_URL%/landing-server-heartbeat}/landing-server-files"
+fi
 
-ssh -o ConnectTimeout=10 -o BatchMode=yes "$REMOTE" \
-  "chown -R landing:landing '$REMOTE_DIR/themes' 2>/dev/null || true"
+STAGE="$(mktemp -d)"
+trap 'rm -rf "$STAGE"' EXIT
+BUILT_OK=false
 
-ok "Theme-Dateien direkt übertragen"
+if [ -n "$FILES_BASE" ]; then
+  BUILT_OK=true
+  for THEME_DIR in "$PROJECT_DIR"/src/landing-themes/theme-*; do
+    [ -d "$THEME_DIR" ] || continue
+    TID="$(basename "$THEME_DIR")"
+    mkdir -p "$STAGE/$TID"
+    for F in template.html style.css script.js; do
+      if ! curl -fsSL --max-time 30 "$FILES_BASE/themes/$TID/$F" -o "$STAGE/$TID/$F" \
+         || [ ! -s "$STAGE/$TID/$F" ]; then
+        warn "Theme-Datei konnte nicht geladen werden: $TID/$F"
+        BUILT_OK=false
+      fi
+    done
+    if [ -d "$THEME_DIR/assets" ]; then
+      mkdir -p "$STAGE/$TID/assets"
+      cp -a "$THEME_DIR/assets/." "$STAGE/$TID/assets/"
+    fi
+  done
+fi
+
+if [ "$BUILT_OK" = true ]; then
+  # Sicherung: das Bewerbungsformular muss enthalten sein, sonst nichts anfassen.
+  if ! grep -rqs "application-form" "$STAGE"; then
+    warn "Fertige Theme-Dateien ohne Bewerbungsformular — Theme-Sync übersprungen"
+    BUILT_OK=false
+  fi
+fi
+
+if [ "$BUILT_OK" = true ]; then
+  rsync -avz --checksum --delete --no-perms "$STAGE/" "$REMOTE:$REMOTE_DIR/themes/"
+  ssh -o ConnectTimeout=10 -o BatchMode=yes "$REMOTE" \
+    "chown -R landing:landing '$REMOTE_DIR/themes' 2>/dev/null || true"
+  ok "Fertige Theme-Dateien übertragen (inkl. Bewerbungsformular)"
+else
+  warn "Theme-Sync übersprungen — Heartbeat holt die Themes vom Portal"
+fi
 
 # ── 2. Resync-Flag in der DB setzen (damit der Heartbeat sofort zieht) ──────
 DB_UPDATED=false
