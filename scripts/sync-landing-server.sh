@@ -115,11 +115,18 @@ if [ -n "$FILES_BASE" ]; then
 fi
 
 if [ "$BUILT_OK" = true ]; then
-  # Sicherung: das Bewerbungsformular muss enthalten sein, sonst nichts anfassen.
+  # Sicherung: Formular UND Formular-Stile müssen enthalten sein, sonst nichts anfassen.
   if ! grep -rqs "application-form" "$STAGE"; then
     warn "Fertige Theme-Dateien ohne Bewerbungsformular — Theme-Sync übersprungen"
     BUILT_OK=false
   fi
+  for TDIR in "$STAGE"/theme-*; do
+    [ -d "$TDIR" ] || continue
+    if ! grep -qs "lov-apply-modal" "$TDIR/style.css"; then
+      warn "Stildatei ohne Formular-Stile: $(basename "$TDIR")/style.css — Theme-Sync übersprungen"
+      BUILT_OK=false
+    fi
+  done
 fi
 
 if [ "$BUILT_OK" = true ]; then

@@ -159,11 +159,15 @@ async function loadTheme(id) {
       }
     } catch (_) { content = ""; }
     // Selbstheilung: Rohvorlagen ohne Bewerbungsformular gelten als unbrauchbar —
-    // template.html/script.js müssen den Formularteil enthalten.
+    // template.html/script.js müssen den Formularteil enthalten, style.css die
+    // Formular-/Fenster-Stile (sonst wird das Formular unformatiert angezeigt).
     const needsForm = fname === "template.html" || fname === "script.js";
-    const broken = needsForm && content && !content.includes("application-form");
+    const localContent = content;
+    const cssIncomplete =
+      fname === "style.css" && !!content && !content.includes("lov-apply-modal") && !/lv-form-section|-form-section\b/.test(content);
+    const broken = (needsForm && content && !content.includes("application-form")) || cssIncomplete;
     if (broken) {
-      console.warn(`[themes] ${safeId}/${fname} ohne Bewerbungsformular — lade vom Portal nach`);
+      console.warn(`[themes] ${safeId}/${fname} unvollständig (Rohvorlage) — lade vom Portal nach`);
       content = "";
     }
     // Fallback: fehlt/leer lokal → vom Portal nachladen (identische Quelle wie Heartbeat-Resync).
@@ -176,7 +180,8 @@ async function loadTheme(id) {
         console.warn(`[themes] portal fetch failed ${safeId}/${fname}: ${e?.message || e}`);
       }
     }
-    out[k] = content;
+    // Portal nicht erreichbar → lieber die unvollständige lokale Fassung als gar nichts.
+    out[k] = content || localContent;
   }
   if (!out.html) {
     themeCache.set(safeId, { ts: Date.now(), theme: null });
@@ -451,6 +456,50 @@ function buildApplyModeBlock(mode) {
 <\/script>`;
 }
 
+// Auf /bewerben: Formular als normalen Seitenabschnitt statt Einblend-Fenster.
+function extractModalForm(html) {
+  const startRe = /<div[^>]*id=["']lov-apply-modal["'][^>]*>/i;
+  const m = startRe.exec(html);
+  if (!m) return null;
+  const start = m.index;
+  const tagRe = /<div\b[^>]*>|<\/div>/gi;
+  tagRe.lastIndex = start + m[0].length;
+  let depth = 1;
+  let end = -1;
+  let t;
+  while ((t = tagRe.exec(html))) {
+    depth += t[0][1] === "/" ? -1 : 1;
+    if (depth === 0) { end = tagRe.lastIndex; break; }
+  }
+  if (end < 0) return null;
+  const block = html.slice(start, end);
+  const bodyRe = /<div[^>]*class=["'][^"']*lov-apply-body[^"']*["'][^>]*>/i;
+  const bm = bodyRe.exec(block);
+  if (!bm) return null;
+  const bodyStart = bm.index + bm[0].length;
+  const innerRe = /<div\b[^>]*>|<\/div>/gi;
+  innerRe.lastIndex = bodyStart;
+  let d = 1;
+  let bodyEnd = -1;
+  let t2;
+  while ((t2 = innerRe.exec(block))) {
+    d += t2[0][1] === "/" ? -1 : 1;
+    if (d === 0) { bodyEnd = t2.index; break; }
+  }
+  if (bodyEnd < 0) return null;
+  return { form: block.slice(bodyStart, bodyEnd), rest: html.slice(0, start) + html.slice(end) };
+}
+
+function unwrapApplyModal(html) {
+  const r = extractModalForm(String(html));
+  if (!r || !/application-form/i.test(r.form)) return html;
+  const section = `\n<div id="lov-apply-inline">${r.form}</div>\n`;
+  const rest = r.rest;
+  const footerIdx = rest.search(/<footer\b/i);
+  if (footerIdx >= 0) return rest.slice(0, footerIdx) + section + rest.slice(footerIdx);
+  return /<\/body>/i.test(rest) ? rest.replace(/<\/body>/i, `${section}</body>`) : rest + section;
+}
+
 // "Jetzt bewerben"-CTAs auf die eigene Unterseite /bewerben umbiegen.
 function rewriteApplyLinks(html) {
   return String(html)
@@ -657,6 +706,7 @@ async function renderHtml(row, host, mode) {
   let html = applyPlaceholders(theme.html, row.branding, slots);
   html = html.replace(/<section[^>]*id=["'](?:impressum|datenschutz)["'][\s\S]*?<\/section>\s*/gi, "");
   html = cleanEmptyMeta(html, row.branding, host);
+  if (mode === "apply") html = unwrapApplyModal(html);
   html = injectTrustFooter(html, row.branding || {});
   html = rewriteApplyLinks(html);
   html = injectLandingConfig(html, row, mode);
@@ -856,6 +906,9 @@ const APPLY_MODAL_CSS = `
 #lov-apply-modal .lov-apply-body>section{padding-top:32px;padding-bottom:32px}
 body.lov-apply-open{overflow:hidden}
 @media(max-width:640px){#lov-apply-modal{padding:12px 8px}#lov-apply-modal .lov-apply-body{max-height:calc(100vh - 24px)}}
+/* Auf /bewerben wird das Formular als normaler Seitenabschnitt ausgeliefert. */
+#lov-apply-inline{display:block;width:100%}
+#lov-apply-inline>section{padding-top:48px;padding-bottom:48px}
 `;
 
 function renderCss(row) {
