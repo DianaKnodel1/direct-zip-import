@@ -5,10 +5,9 @@
 # Wird von deploy.sh aufgerufen, kann aber auch manuell laufen:
 #   LANDING_SYNC_HOST=uwkconsulting bash scripts/sync-landing-server.sh
 #
-# Kopiert server.js, legal-content.js, package.json, heartbeat.sh auf den
-# Remote-Server, setzt themes_resync_requested_at in der DB und startet die
-# Services neu. Der Heartbeat-Agent zieht sich danach selbst die aktuellen
-# Themes vom Portal.
+# Kopiert Renderer und Themes direkt auf den Remote-Server, setzt zusätzlich
+# themes_resync_requested_at in der DB und startet die Services neu. Damit
+# hängen Theme-Updates nicht davon ab, ob der Heartbeat ein Resync-Flag erhält.
 # =============================================================================
 set -euo pipefail
 
@@ -70,6 +69,23 @@ rsync -avz --checksum --no-perms \
 
 ok "Core-Dateien übertragen"
 
+# Themes immer direkt übertragen. Ohne TARGET_DB_URL kann das Resync-Flag nicht
+# gesetzt werden; früher blieb dadurch trotz erfolgreichem Deploy eine alte
+# script.js auf dem Landing-Server liegen.
+if [ ! -d "$PROJECT_DIR/src/landing-themes" ]; then
+  warn "Theme-Verzeichnis fehlt: $PROJECT_DIR/src/landing-themes — Sync abgebrochen"
+  exit 1
+fi
+
+rsync -avz --checksum --delete --no-perms \
+  "$PROJECT_DIR/src/landing-themes/" \
+  "$REMOTE:$REMOTE_DIR/themes/"
+
+ssh -o ConnectTimeout=10 -o BatchMode=yes "$REMOTE" \
+  "chown -R landing:landing '$REMOTE_DIR/themes' 2>/dev/null || true"
+
+ok "Theme-Dateien direkt übertragen"
+
 # ── 2. Resync-Flag in der DB setzen (damit der Heartbeat sofort zieht) ──────
 DB_UPDATED=false
 if [ -n "$TARGET_DB_URL" ]; then
@@ -89,7 +105,7 @@ if [ -n "$TARGET_DB_URL" ]; then
 fi
 
 if [ "$DB_UPDATED" = false ]; then
-  warn "Kein TARGET_DB_URL — Heartbeat holt Themes beim nächsten regulären Lauf"
+  warn "Kein TARGET_DB_URL — Resync-Flag übersprungen; Themes wurden bereits direkt übertragen"
 fi
 
 # ── 3. Services auf dem Remote-Server neustarten ───────────────────────────
