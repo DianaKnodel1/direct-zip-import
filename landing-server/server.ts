@@ -442,6 +442,7 @@ function renderHtml(row: LandingRow, host: string, mode?: string): { body: strin
   let html = applyPlaceholders(theme.html, row.branding, slots);
   html = html.replace(/<section[^>]*id=["'](?:impressum|datenschutz)["'][\s\S]*?<\/section>\s*/gi, "");
   html = cleanEmptyMeta(html, row.branding, host);
+  if (mode === "apply") html = unwrapApplyModal(html);
   html = rewriteApplyLinks(html);
   html = injectLandingConfig(html, row, mode);
   html = versionThemeAssets(html);
