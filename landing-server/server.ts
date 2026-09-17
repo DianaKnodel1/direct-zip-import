@@ -302,6 +302,50 @@ function buildApplyModeBlock(mode) {
 <\/script>`;
 }
 
+// Auf /bewerben: Formular als normalen Seitenabschnitt statt Einblend-Fenster.
+function extractModalForm(html) {
+  const startRe = /<div[^>]*id=["']lov-apply-modal["'][^>]*>/i;
+  const m = startRe.exec(html);
+  if (!m) return null;
+  const start = m.index;
+  const tagRe = /<div\b[^>]*>|<\/div>/gi;
+  tagRe.lastIndex = start + m[0].length;
+  let depth = 1;
+  let end = -1;
+  let t;
+  while ((t = tagRe.exec(html))) {
+    depth += t[0][1] === "/" ? -1 : 1;
+    if (depth === 0) { end = tagRe.lastIndex; break; }
+  }
+  if (end < 0) return null;
+  const block = html.slice(start, end);
+  const bodyRe = /<div[^>]*class=["'][^"']*lov-apply-body[^"']*["'][^>]*>/i;
+  const bm = bodyRe.exec(block);
+  if (!bm) return null;
+  const bodyStart = bm.index + bm[0].length;
+  const innerRe = /<div\b[^>]*>|<\/div>/gi;
+  innerRe.lastIndex = bodyStart;
+  let d = 1;
+  let bodyEnd = -1;
+  let t2;
+  while ((t2 = innerRe.exec(block))) {
+    d += t2[0][1] === "/" ? -1 : 1;
+    if (d === 0) { bodyEnd = t2.index; break; }
+  }
+  if (bodyEnd < 0) return null;
+  return { form: block.slice(bodyStart, bodyEnd), rest: html.slice(0, start) + html.slice(end) };
+}
+
+function unwrapApplyModal(html) {
+  const r = extractModalForm(String(html));
+  if (!r || !/application-form/i.test(r.form)) return html;
+  const section = `\n<div id="lov-apply-inline">${r.form}</div>\n`;
+  const rest = r.rest;
+  const footerIdx = rest.search(/<footer\b/i);
+  if (footerIdx >= 0) return rest.slice(0, footerIdx) + section + rest.slice(footerIdx);
+  return /<\/body>/i.test(rest) ? rest.replace(/<\/body>/i, `${section}</body>`) : rest + section;
+}
+
 // "Jetzt bewerben"-CTAs auf die eigene Unterseite /bewerben umbiegen.
 function rewriteApplyLinks(html) {
   return String(html)
