@@ -552,9 +552,22 @@ function renderBlogPost(row: LandingRow, n: number): string | null {
 </html>`;
 }
 
+const APPLY_MODAL_CSS = `
+/* Bewerbungsfenster: wird vom Landing-Server auf /bewerben geöffnet. */
+#lov-apply-modal{position:fixed;inset:0;z-index:9999;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;background:rgba(8,12,24,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#lov-apply-modal.is-open{display:flex}
+#lov-apply-modal .lov-apply-dialog{position:relative;width:100%;max-width:880px;background:#fff;border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.35);overflow:hidden;animation:lovApplyIn .25s ease}
+@keyframes lovApplyIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+#lov-apply-modal .lov-apply-close{position:absolute;top:14px;right:14px;z-index:2;width:38px;height:38px;border-radius:50%;border:0;background:rgba(15,23,42,.85);color:#fff;font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+#lov-apply-modal .lov-apply-body{max-height:calc(100vh - 80px);overflow-y:auto}
+#lov-apply-modal .lov-apply-body>section{padding-top:32px;padding-bottom:32px}
+body.lov-apply-open{overflow:hidden}
+@media(max-width:640px){#lov-apply-modal{padding:12px 8px}#lov-apply-modal .lov-apply-body{max-height:calc(100vh - 24px)}}
+`;
+
 function renderCss(row: LandingRow): string {
   const t = THEMES[row.theme_id];
-  return t ? applyPlaceholders(t.css, row.branding, row.slots) : "/* theme missing */";
+  return t ? `${applyPlaceholders(t.css, row.branding, row.slots)}\n${APPLY_MODAL_CSS}` : "/* theme missing */";
 }
 function renderJs(row: LandingRow): string {
   const t = THEMES[row.theme_id];
