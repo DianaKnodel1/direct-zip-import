@@ -158,6 +158,14 @@ async function loadTheme(id) {
         content = readFileSync(join(dir, fname), "utf8");
       }
     } catch (_) { content = ""; }
+    // Selbstheilung: Rohvorlagen ohne Bewerbungsformular gelten als unbrauchbar —
+    // template.html/script.js müssen den Formularteil enthalten.
+    const needsForm = fname === "template.html" || fname === "script.js";
+    const broken = needsForm && content && !content.includes("application-form");
+    if (broken) {
+      console.warn(`[themes] ${safeId}/${fname} ohne Bewerbungsformular — lade vom Portal nach`);
+      content = "";
+    }
     // Fallback: fehlt/leer lokal → vom Portal nachladen (identische Quelle wie Heartbeat-Resync).
     if (!content && PORTAL_FILES_BASE) {
       try {
